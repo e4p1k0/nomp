@@ -32,22 +32,22 @@
         "url": "https://github.com/e4p1k0/nomp.git"
     },
     "dependencies": {
-        "stratum-pool": "https://github.com/e4p1k0/rwahash-stratum-pool.git",
-        "dateformat": "1.0.12",
-        "node-json-minify": "*",
-        "redis": "^4.6.10",
-        "mysql": "*",
         "async": "1.5.2",
-        "express": "*",
-        "body-parser": "*",
-        "compression": "*",
-        "dot": "*",
-        "colors": "*",
-        "node-watch": "0.5.9",
-        "request": "2.69.0",
-        "nonce": "*",
         "bignum": "0.13.1",
-        "extend": "*"
+        "body-parser": "*",
+        "colors": "*",
+        "compression": "*",
+        "dateformat": "1.0.12",
+        "dot": "*",
+        "express": "*",
+        "extend": "*",
+        "mysql": "*",
+        "node-json-minify": "*",
+        "node-watch": "0.5.9",
+        "nonce": "*",
+        "redis": "0.12.1",
+        "request": "2.69.0",
+        "stratum-pool": "git+https://github.com/e4p1k0/rwahash-stratum-pool.git"
     },
     "engines": {
         "node": ">=12"

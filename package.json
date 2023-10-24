@@ -1,7 +1,7 @@
 {
     "name": "node-open-mining-portal",
     "version": "0.0.4",
-    "description": "An extremely efficient, highly scalable, all-in-one, easy to setup cryptocurrency mining pool",
+    "description": "Reworked classic NOMP with improved data in DB",
     "keywords": [
         "stratum",
         "mining",
@@ -10,11 +10,12 @@
         "poolserver",
         "bitcoin",
         "litecoin",
-        "scrypt"
+        "scrypt",
+        "rwahash"
     ],
-    "homepage": "https://github.com/zone117x/node-open-mining-portal",
+    "homepage": "https://github.com/e4p1k0/nomp",
     "bugs": {
-        "url": "https://github.com/zone117x/node-open-mining-portal/issues"
+        "url": "https://github.com/e4p1k0/nomp/issues"
     },
     "license": "GPL-2.0",
     "author": "Matthew Little",
@@ -28,13 +29,13 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/zone117x/node-open-mining-portal.git"
+        "url": "https://github.com/e4p1k0/nomp.git"
     },
     "dependencies": {
-        "stratum-pool": "https://github.com/zone117x/node-stratum-pool.git",
+        "stratum-pool": "https://github.com/e4p1k0/rwahash-stratum-pool.git",
         "dateformat": "1.0.12",
         "node-json-minify": "*",
-        "redis": "0.12.1",
+        "redis": "^4.6.10",
         "mysql": "*",
         "async": "1.5.2",
         "express": "*",
@@ -49,6 +50,6 @@
         "extend": "*"
     },
     "engines": {
-        "node": ">=0.10"
+        "node": ">=12"
     }
 }

@@ -4,7 +4,7 @@ var path = require('path');
 
 var async = require('async');
 var watch = require('node-watch');
-var redis = require('redis');
+const redis = require('redis');
 
 var dot = require('dot');
 var express = require('express');
@@ -127,7 +127,13 @@ module.exports = function(logger){
     var buildKeyScriptPage = function(){
         async.waterfall([
             function(callback){
-                var client = redis.createClient(portalConfig.redis.port, portalConfig.redis.host);
+                const redisConfig = portalConfig.redis;
+                const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
+                const client = redis.createClient(redisConfig.port, redisConfig.host, {
+                    db: redisDB,
+                    auth_pass: redisConfig.auth
+                });
+
                 client.hgetall('coinVersionBytes', function(err, coinBytes){
                     if (err){
                         client.quit();

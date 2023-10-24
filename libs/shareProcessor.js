@@ -1,7 +1,5 @@
-var redis = require('redis');
-var Stratum = require('stratum-pool');
-
-
+const redis = require('redis');
+const Stratum = require('stratum-pool');
 
 /*
 This module deals with handling shares when in internal payment processing mode. It connects to a redis
@@ -13,20 +11,22 @@ value: a hash with..
 
  */
 
-
-
 module.exports = function(logger, poolConfig){
+    const coin = poolConfig.coin.name;
+    const redisConfig = poolConfig.redis;
+    const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
 
-    var redisConfig = poolConfig.redis;
-    var coin = poolConfig.coin.name;
-
+    const connection = redis.createClient(redisConfig.port, redisConfig.host, {
+        db: redisDB,
+        auth_pass: redisConfig.auth
+    });
 
     var forkId = process.env.forkId;
     var logSystem = 'Pool';
     var logComponent = coin;
     var logSubCat = 'Thread ' + (parseInt(forkId) + 1);
 
-    var connection = redis.createClient(redisConfig.port, redisConfig.host);
+    // var connection = redis.createClient(redisConfig.port, redisConfig.host);
 
     connection.on('ready', function(){
         logger.debug(logSystem, logComponent, logSubCat, 'Share processing setup with redis (' + redisConfig.host +

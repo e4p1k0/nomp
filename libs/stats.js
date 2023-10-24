@@ -1,6 +1,7 @@
 var zlib = require('zlib');
 
-var redis = require('redis');
+const redis = require('redis');
+
 var async = require('async');
 
 
@@ -35,7 +36,8 @@ module.exports = function(logger, portalConfig, poolConfigs){
 
         var poolConfig = poolConfigs[coin];
 
-        var redisConfig = poolConfig.redis;
+        const redisConfig = poolConfig.redis;
+        const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
 
         for (var i = 0; i < redisClients.length; i++){
             var client = redisClients[i];
@@ -44,9 +46,13 @@ module.exports = function(logger, portalConfig, poolConfigs){
                 return;
             }
         }
+
         redisClients.push({
             coins: [coin],
-            client: redis.createClient(redisConfig.port, redisConfig.host)
+            client: redis.createClient(redisConfig.port, redisConfig.host, {
+                db: redisDB,
+                auth_pass: redisConfig.auth
+            })
         });
     });
 

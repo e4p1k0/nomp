@@ -1,6 +1,6 @@
 var fs = require('fs');
 
-var redis = require('redis');
+const redis = require('redis');
 var async = require('async');
 
 var Stratum = require('stratum-pool');

@@ -4,7 +4,7 @@ var path = require('path');
 
 var async = require('async');
 var watch = require('node-watch');
-const redis = require('redis');
+const redis = require('ioredis');
 
 var dot = require('dot');
 var express = require('express');

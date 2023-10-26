@@ -1,4 +1,4 @@
-const redis = require('redis');
+const redis = require('ioredis');
 const Stratum = require('stratum-pool');
 
 /*
@@ -16,17 +16,19 @@ module.exports = function(logger, poolConfig){
     const redisConfig = poolConfig.redis;
     const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
 
-    const connection = redis.createClient(redisConfig.port, redisConfig.host, {
-        db: redisDB,
-        auth_pass: redisConfig.auth
-    });
+    const connection = new Redis({
+        port: redisConfig.port,
+        host: redisConfig.host,
+        db: redisConfig.db,
+        maxRetriesPerRequest: 1,
+        readTimeout: 5
+    })
+
 
     var forkId = process.env.forkId;
     var logSystem = 'Pool';
     var logComponent = coin;
     var logSubCat = 'Thread ' + (parseInt(forkId) + 1);
-
-    // var connection = redis.createClient(redisConfig.port, redisConfig.host);
 
     connection.on('ready', function(){
         logger.debug(logSystem, logComponent, logSubCat, 'Share processing setup with redis (' + redisConfig.host +

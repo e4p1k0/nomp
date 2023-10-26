@@ -1,6 +1,6 @@
 var fs = require('fs');
 
-const redis = require('redis');
+const redis = require('ioredis');
 var async = require('async');
 
 var Stratum = require('stratum-pool');
@@ -54,7 +54,14 @@ function SetupForPool(logger, poolOptions, setupFinished){
     var daemon = new Stratum.daemon.interface([processingConfig.daemon], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
-    var redisClient = redis.createClient(poolOptions.redis.port, poolOptions.redis.host);
+    const redisConfig = poolOptions.redis;
+    const redisClient = new Redis({
+        port: redisConfig.port,
+        host: redisConfig.host,
+        db: redisConfig.db,
+        maxRetriesPerRequest: 1,
+        readTimeout: 5
+    })
 
     var magnitude;
     var minPaymentSatoshis;

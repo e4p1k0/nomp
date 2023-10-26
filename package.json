@@ -32,8 +32,7 @@
         "url": "https://github.com/e4p1k0/nomp.git"
     },
     "dependencies": {
-        "async": "1.5.2",
-        "bignum": "^0.13.1",
+        "async": "^3.2.4",
         "body-parser": "*",
         "colors": "*",
         "compression": "*",

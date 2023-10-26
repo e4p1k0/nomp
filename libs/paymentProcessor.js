@@ -183,14 +183,13 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         return;
                     }
 
-
-
                     var workers = {};
-                    for (var w in results[0]){
+                    for (var w in results[0][1]){
                         workers[w] = {balance: coinsToSatoshies(parseFloat(results[0][w]))};
                     }
 
-                    var rounds = results[1].map(function(r){
+                    var rounds = results[1][1].map(function(r){
+                        console.log('r', r)
                         var details = r.split(':');
                         return {
                             blockHash: details[0],
@@ -328,7 +327,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
 
 
                     rounds.forEach(function(round, i){
-                        var workerShares = allWorkerShares[i];
+                        var workerShares = allWorkerShares[i][1];
 
                         if (!workerShares){
                             logger.error(logSystem, logComponent, 'No worker shares for round: '

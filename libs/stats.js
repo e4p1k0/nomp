@@ -148,15 +148,15 @@ module.exports = function(logger, portalConfig, poolConfigs){
                             algorithm: poolConfigs[coinName].coin.algorithm,
                             hashrates: replies[i + 1],
                             poolStats: {
-                                validShares: replies[i + 2] ? (replies[i + 2].validShares || 0) : 0,
-                                validBlocks: replies[i + 2] ? (replies[i + 2].validBlocks || 0) : 0,
-                                invalidShares: replies[i + 2] ? (replies[i + 2].invalidShares || 0) : 0,
-                                totalPaid: replies[i + 2] ? (replies[i + 2].totalPaid || 0) : 0
+                                validShares: replies[i + 2][1] ? (replies[i + 2][1].validShares || 0) : 0,
+                                validBlocks: replies[i + 2][1] ? (replies[i + 2][1].validBlocks || 0) : 0,
+                                invalidShares: replies[i + 2][1] ? (replies[i + 2][1].invalidShares || 0) : 0,
+                                totalPaid: replies[i + 2][1] ? (replies[i + 2][1].totalPaid || 0) : 0
                             },
                             blocks: {
-                                pending: replies[i + 3],
-                                confirmed: replies[i + 4],
-                                orphaned: replies[i + 5]
+                                pending: replies[i + 3][1],
+                                confirmed: replies[i + 4][1],
+                                orphaned: replies[i + 5][1]
                             }
                         };
                         allCoinStats[coinStats.name] = (coinStats);

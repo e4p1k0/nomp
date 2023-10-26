@@ -1,20 +1,17 @@
-var fs = require('fs');
-
+const fs = require('fs');
+const async = require('async');
 const Redis = require('ioredis');
-var async = require('async');
 
-var Stratum = require('stratum-pool');
-var util = require('stratum-pool/lib/util.js');
+const Stratum = require('stratum-pool');
+const util = require('stratum-pool/lib/util.js');
 
 
 module.exports = function(logger){
-
-    var poolConfigs = JSON.parse(process.env.pools);
-
-    var enabledPools = [];
+    const poolConfigs = JSON.parse(process.env.pools);
+    let enabledPools = [];
 
     Object.keys(poolConfigs).forEach(function(coin) {
-        var poolOptions = poolConfigs[coin];
+        const poolOptions = poolConfigs[coin];
         if (poolOptions.paymentProcessing &&
             poolOptions.paymentProcessing.enabled)
             enabledPools.push(coin);
@@ -24,13 +21,15 @@ module.exports = function(logger){
         SetupForPool(logger, poolConfigs[coin], function(setupResults){
             callback(setupResults);
         });
-    }, function(coins){
+    }, function(coins, er){
+        //  in old async ver
+        // console.log('coins', coins)
+        // coins [ 'goodmorning' ]
         coins.forEach(function(coin){
-
-            var poolOptions = poolConfigs[coin];
-            var processingConfig = poolOptions.paymentProcessing;
-            var logSystem = 'Payments';
-            var logComponent = coin;
+            const poolOptions = poolConfigs[coin];
+            const processingConfig = poolOptions.paymentProcessing;
+            const logSystem = 'Payments';
+            const logComponent = coin;
 
             logger.debug(logSystem, logComponent, 'Payment processing setup to run every '
                 + processingConfig.paymentInterval + ' second(s) with daemon ('
@@ -41,17 +40,12 @@ module.exports = function(logger){
     });
 };
 
-
 function SetupForPool(logger, poolOptions, setupFinished){
-
-
-    var coin = poolOptions.coin.name;
-    var processingConfig = poolOptions.paymentProcessing;
-
-    var logSystem = 'Payments';
-    var logComponent = coin;
-
-    var daemon = new Stratum.daemon.interface([processingConfig.daemon], function(severity, message){
+    const coin = poolOptions.coin.name;
+    const processingConfig = poolOptions.paymentProcessing;
+    const logSystem = 'Payments';
+    const logComponent = coin;
+    const daemon = new Stratum.daemon.interface([processingConfig.daemon], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
     const redisConfig = poolOptions.redis;
@@ -63,11 +57,10 @@ function SetupForPool(logger, poolOptions, setupFinished){
         readTimeout: 5
     })
 
-    var magnitude;
-    var minPaymentSatoshis;
-    var coinPrecision;
-
-    var paymentInterval;
+    let magnitude;
+    let minPaymentSatoshis;
+    let coinPrecision;
+    let paymentInterval;
 
     async.parallel([
         function(callback){
@@ -75,25 +68,21 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 if (result.error){
                     logger.error(logSystem, logComponent, 'Error with payment processing daemon ' + JSON.stringify(result.error));
                     callback(true);
-                }
-                else if (!result.response || !result.response.ismine) {
+                } else if (!result.response || !result.response.ismine) {
                             daemon.cmd('getaddressinfo', [poolOptions.address], function(result) {
                         if (result.error){
                             logger.error(logSystem, logComponent, 'Error with payment processing daemon, getaddressinfo failed ... ' + JSON.stringify(result.error));
                             callback(true);
-                        }
-                        else if (!result.response || !result.response.ismine) {
+                        } else if (!result.response || !result.response.ismine) {
                             logger.error(logSystem, logComponent,
                                     'Daemon does not own pool address - payment processing can not be done with this daemon, '
                                     + JSON.stringify(result.response));
                             callback(true);
-                        }
-                        else{
+                        } else{
                             callback()
                         }
                     }, true);
-                }
-                else{
+                } else{
                     callback()
                 }
             }, true);
@@ -104,8 +93,9 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     callback(true);
                     return;
                 }
+
                 try {
-                    var d = result.data.split('result":')[1].split(',')[0].split('.')[1];
+                    const d = result.data.split('result":')[1].split(',')[0].split('.')[1];
                     magnitude = parseInt('10' + new Array(d.length).join('0'));
                     minPaymentSatoshis = parseInt(processingConfig.minimumPayment * magnitude);
                     coinPrecision = magnitude.toString().length - 1;
@@ -113,6 +103,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 }
                 catch(e){
                     logger.error(logSystem, logComponent, 'Error detecting number of satoshis in a coin, cannot do payment processing. Tried parsing: ' + result.data);
+                    console.log('error', e)
                     callback(true);
                 }
 
@@ -134,38 +125,33 @@ function SetupForPool(logger, poolOptions, setupFinished){
         setupFinished(true);
     });
 
-
-
-
-    var satoshisToCoins = function(satoshis){
+    const satoshisToCoins = function(satoshis){
         return parseFloat((satoshis / magnitude).toFixed(coinPrecision));
     };
 
-    var coinsToSatoshies = function(coins){
+    const coinsToSatoshies = function(coins){
         return coins * magnitude;
     };
 
     /* Deal with numbers in smallest possible units (satoshis) as much as possible. This greatly helps with accuracy
        when rounding and whatnot. When we are storing numbers for only humans to see, store in whole coin units. */
 
-    var processPayments = function(){
+    const processPayments = function(){
+        const startPaymentProcess = Date.now();
 
-        var startPaymentProcess = Date.now();
+        let timeSpentRPC = 0;
+        let timeSpentRedis = 0;
 
-        var timeSpentRPC = 0;
-        var timeSpentRedis = 0;
+        let startTimeRedis;
+        let startTimeRPC;
 
-        var startTimeRedis;
-        var startTimeRPC;
+        const startRedisTimer = function(){ startTimeRedis = Date.now() };
+        const endRedisTimer = function(){ timeSpentRedis += Date.now() - startTimeRedis };
 
-        var startRedisTimer = function(){ startTimeRedis = Date.now() };
-        var endRedisTimer = function(){ timeSpentRedis += Date.now() - startTimeRedis };
-
-        var startRPCTimer = function(){ startTimeRPC = Date.now(); };
-        var endRPCTimer = function(){ timeSpentRPC += Date.now() - startTimeRedis };
+        const startRPCTimer = function(){ startTimeRPC = Date.now(); };
+        const endRPCTimer = function(){ timeSpentRPC += Date.now() - startTimeRedis };
 
         async.waterfall([
-
             /* Call redis to get an array of rounds - which are coinbase transactions and block heights from submitted
                blocks. */
             function(callback){
@@ -183,14 +169,13 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         return;
                     }
 
-                    var workers = {};
-                    for (var w in results[0][1]){
+                    let workers = {};
+                    for (const w in results[0][1]){
                         workers[w] = {balance: coinsToSatoshies(parseFloat(results[0][w]))};
                     }
 
-                    var rounds = results[1][1].map(function(r){
-                        console.log('r', r)
-                        var details = r.split(':');
+                    const rounds = results[1][1].map(function(r){
+                        const details = r.split(':');
                         return {
                             blockHash: details[0],
                             txHash: details[1],
@@ -206,8 +191,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
             /* Does a batch rpc call to daemon with all the transaction hashes to see if they are confirmed yet.
                It also adds the block reward amount to the round object - which the daemon gives also gives us. */
             function(workers, rounds, callback){
-
-                var batchRPCcommand = rounds.map(function(r){
+                let batchRPCcommand = rounds.map(function(r){
                     return ['gettransaction', [r.txHash]];
                 });
 
@@ -224,8 +208,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         return;
                     }
 
-                    var addressAccount;
-
+                    let addressAccount;
                     txDetails.forEach(function(tx, i){
 
                         if (i === txDetails.length - 1){
@@ -233,19 +216,17 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             return;
                         }
 
-                        var round = rounds[i];
+                        const round = rounds[i];
 
                         if (tx.error && tx.error.code === -5){
                             logger.warning(logSystem, logComponent, 'Daemon reports invalid transaction: ' + round.txHash);
                             round.category = 'kicked';
                             return;
-                        }
-                        else if (!tx.result.details || (tx.result.details && tx.result.details.length === 0)){
+                        } else if (!tx.result.details || (tx.result.details && tx.result.details.length === 0)) {
                             logger.warning(logSystem, logComponent, 'Daemon reports no details for transaction: ' + round.txHash);
                             round.category = 'kicked';
                             return;
-                        }
-                        else if (tx.error || !tx.result){
+                        } else if (tx.error || !tx.result){
                             logger.error(logSystem, logComponent, 'Odd error with gettransaction ' + round.txHash + ' '
                                 + JSON.stringify(tx));
                             return;
@@ -273,9 +254,10 @@ function SetupForPool(logger, poolOptions, setupFinished){
 
                     });
 
-                    var canDeleteShares = function(r){
-                        for (var i = 0; i < rounds.length; i++){
-                            var compareR = rounds[i];
+                    const canDeleteShares = function(r){
+                        for (const compareR of rounds){
+                        // for (let i = 0; i < rounds.length; i++){
+                            // var compareR = rounds[i];
                             if ((compareR.height === r.height)
                                 && (compareR.category !== 'kicked')
                                 && (compareR.category !== 'orphan')
@@ -300,19 +282,15 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         }
                     });
 
-
                     callback(null, workers, rounds, addressAccount);
 
                 });
             },
 
-
             /* Does a batch redis call to get shares contributed to each round. Then calculates the reward
                amount owned to each miner for each round. */
             function(workers, rounds, addressAccount, callback){
-
-
-                var shareLookups = rounds.map(function(r){
+                const shareLookups = rounds.map(function(r){
                     return ['hgetall', coin + ':shares:round' + r.height]
                 });
 
@@ -325,9 +303,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         return;
                     }
 
-
                     rounds.forEach(function(round, i){
-                        var workerShares = allWorkerShares[i][1];
+                        let workerShares = allWorkerShares[i][1];
 
                         if (!workerShares){
                             logger.error(logSystem, logComponent, 'No worker shares for round: '
@@ -344,16 +321,16 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             case 'generate':
                                 /* We found a confirmed block! Now get the reward for it and calculate how much
                                    we owe each miner based on the shares they submitted during that block round. */
-                                var reward = parseInt(round.reward * magnitude);
+                                const reward = parseInt(round.reward * magnitude);
 
-                                var totalShares = Object.keys(workerShares).reduce(function(p, c){
+                                const totalShares = Object.keys(workerShares).reduce(function(p, c){
                                     return p + parseFloat(workerShares[c])
                                 }, 0);
 
-                                for (var workerAddress in workerShares){
-                                    var percent = parseFloat(workerShares[workerAddress]) / totalShares;
-                                    var workerRewardTotal = Math.floor(reward * percent);
-                                    var worker = workers[workerAddress] = (workers[workerAddress] || {});
+                                for (const workerAddress in workerShares){
+                                    const percent = parseFloat(workerShares[workerAddress]) / totalShares;
+                                    const workerRewardTotal = Math.floor(reward * percent);
+                                    let worker = workers[workerAddress] = (workers[workerAddress] || {});
                                     worker.reward = (worker.reward || 0) + workerRewardTotal;
                                 }
                                 break;
@@ -364,7 +341,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 });
             },
 
-
             /* Calculate if any payments are ready to be sent and trigger them sending
              Get balance different for each address and pass it along as object of latest balances such as
              {worker1: balance1, worker2, balance2}
@@ -372,22 +348,19 @@ function SetupForPool(logger, poolOptions, setupFinished){
              if not sending the balance, the differnce should be +(the amount they earned this round)
              */
             function(workers, rounds, addressAccount, callback) {
-
-                var trySend = function (withholdPercent) {
-                    var addressAmounts = {};
-                    var totalSent = 0;
-                    for (var w in workers) {
-                        var worker = workers[w];
+                const trySend = function (withholdPercent) {
+                    let addressAmounts = {};
+                    let totalSent = 0;
+                    for (const worker of workers) {
                         worker.balance = worker.balance || 0;
                         worker.reward = worker.reward || 0;
-                        var toSend = (worker.balance + worker.reward) * (1 - withholdPercent);
+                        const toSend = (worker.balance + worker.reward) * (1 - withholdPercent);
                         if (toSend >= minPaymentSatoshis) {
                             totalSent += toSend;
-                            var address = worker.address = (worker.address || getProperAddress(w));
+                            const address = worker.address = (worker.address || getProperAddress(w));
                             worker.sent = addressAmounts[address] = satoshisToCoins(toSend);
                             worker.balanceChange = Math.min(worker.balance, toSend) * -1;
-                        }
-                        else {
+                        } else {
                             worker.balanceChange = Math.max(toSend - worker.balance, 0);
                             worker.sent = 0;
                         }
@@ -401,17 +374,15 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     daemon.cmd('sendmany', [addressAccount || '', addressAmounts], function (result) {
                         //Check if payments failed because wallet doesn't have enough coins to pay for tx fees
                         if (result.error && result.error.code === -6) {
-                            var higherPercent = withholdPercent + 0.01;
+                            const higherPercent = withholdPercent + 0.01;
                             logger.warning(logSystem, logComponent, 'Not enough funds to cover the tx fees for sending out payments, decreasing rewards by '
                                 + (higherPercent * 100) + '% and retrying');
                             trySend(higherPercent);
-                        }
-                        else if (result.error) {
+                        } else if (result.error) {
                             logger.error(logSystem, logComponent, 'Error trying to send payments with RPC sendmany '
                                 + JSON.stringify(result.error));
                             callback(true);
-                        }
-                        else {
+                        } else {
                             logger.debug(logSystem, logComponent, 'Sent out a total of ' + (totalSent / magnitude)
                                 + ' to ' + Object.keys(addressAmounts).length + ' workers');
                             if (withholdPercent > 0) {
@@ -427,14 +398,12 @@ function SetupForPool(logger, poolOptions, setupFinished){
 
             },
             function(workers, rounds, callback){
+                let totalPaid = 0;
+                let balanceUpdateCommands = [];
+                let workerPayoutsCommand = [];
 
-                var totalPaid = 0;
-
-                var balanceUpdateCommands = [];
-                var workerPayoutsCommand = [];
-
-                for (var w in workers) {
-                    var worker = workers[w];
+                for (const w in workers) {
+                    const worker = workers[w];
                     if (worker.balanceChange !== 0){
                         balanceUpdateCommands.push([
                             'hincrbyfloat',
@@ -449,14 +418,12 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     }
                 }
 
+                let movePendingCommands = [];
+                let roundsToDelete = [];
+                let orphanMergeCommands = [];
 
-
-                var movePendingCommands = [];
-                var roundsToDelete = [];
-                var orphanMergeCommands = [];
-
-                var moveSharesToCurrent = function(r){
-                    var workerShares = r.workerShares;
+                const moveSharesToCurrent = function(r){
+                    const workerShares = r.workerShares;
                     Object.keys(workerShares).forEach(function(worker){
                         orphanMergeCommands.push(['hincrby', coin + ':shares:roundCurrent',
                             worker, workerShares[worker]]);
@@ -464,7 +431,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 };
 
                 rounds.forEach(function(r){
-
                     switch(r.category){
                         case 'kicked':
                             movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksKicked', r.serialized]);
@@ -480,10 +446,9 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             roundsToDelete.push(coin + ':shares:round' + r.height);
                             return;
                     }
-
                 });
 
-                var finalRedisCommands = [];
+                let finalRedisCommands = [];
 
                 if (movePendingCommands.length > 0)
                     finalRedisCommands = finalRedisCommands.concat(movePendingCommands);
@@ -503,7 +468,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 if (totalPaid !== 0)
                     finalRedisCommands.push(['hincrbyfloat', coin + ':stats', 'totalPaid', totalPaid]);
 
-                if (finalRedisCommands.length === 0){
+                if (finalRedisCommands.length === 0) {
                     callback();
                     return;
                 }
@@ -526,8 +491,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
             }
 
         ], function(){
-
-            var paymentProcessTime = Date.now() - startPaymentProcess;
+            const paymentProcessTime = Date.now() - startPaymentProcess;
             logger.debug(logSystem, logComponent, 'Finished interval - time spent: '
                 + paymentProcessTime + 'ms total, ' + timeSpentRedis + 'ms redis, '
                 + timeSpentRPC + 'ms daemon RPC');
@@ -535,13 +499,10 @@ function SetupForPool(logger, poolOptions, setupFinished){
         });
     };
 
-
-    var getProperAddress = function(address){
+    const getProperAddress = function(address){
         if (address.length === 40){
             return util.addressFromEx(poolOptions.address, address);
         }
         else return address;
     };
-
-
 }

@@ -1,4 +1,4 @@
-const redis = require('ioredis');
+const Redis = require('ioredis');
 var async = require('async');
 
 var stats = require('./stats.js');

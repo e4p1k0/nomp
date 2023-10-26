@@ -1,4 +1,4 @@
-const redis = require('ioredis');
+const Redis = require('ioredis');
 const Stratum = require('stratum-pool');
 
 /*
@@ -19,7 +19,7 @@ module.exports = function(logger, poolConfig){
     const connection = new Redis({
         port: redisConfig.port,
         host: redisConfig.host,
-        db: redisConfig.db,
+        db: redisDB,
         maxRetriesPerRequest: 1,
         readTimeout: 5
     })

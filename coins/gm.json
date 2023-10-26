@@ -1,5 +1,5 @@
 {
   "name": "GoodMorning",
   "symbol": "GMN",
-  "algorithm": "Rwahash"
+  "algorithm": "rwahash"
 }

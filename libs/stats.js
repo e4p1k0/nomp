@@ -1,6 +1,6 @@
 var zlib = require('zlib');
 
-const redis = require('ioredis');
+const Redis = require('ioredis');
 
 var async = require('async');
 

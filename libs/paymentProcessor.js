@@ -21,7 +21,11 @@ module.exports = function(logger){
         SetupForPool(logger, poolConfigs[coin], function(setupResults){
             callback(setupResults);
         });
-    }, function(coins, er){
+    }, function(coins, error){
+        if (error) {
+            console.log('error', error)
+        }
+
         //  in old async ver
         // console.log('coins', coins)
         // coins [ 'goodmorning' ]
@@ -103,7 +107,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 }
                 catch(e){
                     logger.error(logSystem, logComponent, 'Error detecting number of satoshis in a coin, cannot do payment processing. Tried parsing: ' + result.data);
-                    console.log('error', e)
                     callback(true);
                 }
 
@@ -232,16 +235,16 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             return;
                         }
 
-                        var generationTx = tx.result.details.filter(function(tx){
+                        let generationTx = tx.result.details.filter(function(tx) {
                             return tx.address === poolOptions.address;
                         })[0];
 
 
-                        if (!generationTx && tx.result.details.length === 1){
+                        if (!generationTx && tx.result.details.length === 1) {
                             generationTx = tx.result.details[0];
                         }
 
-                        if (!generationTx){
+                        if (!generationTx) {
                             logger.error(logSystem, logComponent, 'Missing output details to pool address for transaction '
                                 + round.txHash);
                             return;
@@ -351,7 +354,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 const trySend = function (withholdPercent) {
                     let addressAmounts = {};
                     let totalSent = 0;
-                    for (const worker of workers) {
+                    for (const w in workers) {
+                        const worker = workers[w];
                         worker.balance = worker.balance || 0;
                         worker.reward = worker.reward || 0;
                         const toSend = (worker.balance + worker.reward) * (1 - withholdPercent);

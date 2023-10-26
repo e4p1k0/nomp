@@ -1,8 +1,6 @@
-var dateFormat = require('dateformat');
-var colors = require('colors');
+const colors = require('colors');
 
-
-var severityToColor = function(severity, text) {
+const severityToColor = function(severity, text) {
     switch(severity) {
         case 'special':
             return text.cyan.underline;
@@ -18,7 +16,7 @@ var severityToColor = function(severity, text) {
     }
 };
 
-var severityValues = {
+const severityValues = {
     'debug': 1,
     'warning': 2,
     'error': 3,
@@ -26,40 +24,37 @@ var severityValues = {
 };
 
 
-var PoolLogger = function (configuration) {
+const PoolLogger = function (configuration) {
+    const logLevelInt = severityValues[configuration.logLevel];
+    const logColors = configuration.logColors;
 
-
-    var logLevelInt = severityValues[configuration.logLevel];
-    var logColors = configuration.logColors;
-
-
-
-    var log = function(severity, system, component, text, subcat) {
-
+    const log = function(severity, system, component, text, subcat) {
         if (severityValues[severity] < logLevelInt) return;
 
         if (subcat){
-            var realText = subcat;
-            var realSubCat = text;
+            const realText = subcat;
+            const realSubCat = text;
             text = realText;
             subcat = realSubCat;
         }
 
-        var entryDesc = dateFormat(new Date(), 'yyyy-mm-dd HH:MM:ss') + ' [' + system + ']\t';
+        const prettyDate = new Date().toISOString()
+            .replace(/T/, ' ')
+            .replace(/\..+/, '')
+        let entryDesc = prettyDate + ' [' + system + ']\t';
+        let logString;
         if (logColors) {
             entryDesc = severityToColor(severity, entryDesc);
 
-            var logString =
+            logString =
                     entryDesc +
                     ('[' + component + '] ').italic;
 
-            if (subcat)
-                logString += ('(' + subcat + ') ').bold.grey;
+            if (subcat) logString += ('(' + subcat + ') ').bold.grey;
 
             logString += text.grey;
-        }
-        else {
-            var logString =
+        } else {
+            logString =
                     entryDesc +
                     '[' + component + '] ';
 
@@ -70,16 +65,13 @@ var PoolLogger = function (configuration) {
         }
 
         console.log(logString);
-
-
     };
 
     // public
-
-    var _this = this;
+    const _this = this;
     Object.keys(severityValues).forEach(function(logType){
         _this[logType] = function(){
-            var args = Array.prototype.slice.call(arguments, 0);
+            const args = Array.prototype.slice.call(arguments, 0);
             args.unshift(logType);
             log.apply(this, args);
         };

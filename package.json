@@ -44,10 +44,9 @@
         "node-json-minify": "*",
         "node-watch": "^0.7.4",
         "nonce": "*",
-        "request": "^2.88.2",
         "stratum-pool": "git+https://github.com/e4p1k0/rwahash-stratum-pool.git"
     },
     "engines": {
-        "node": ">=12"
+        "node": ">=18"
     }
 }

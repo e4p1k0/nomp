@@ -4,19 +4,13 @@ var bignum = require('bignum');
 var algos  = require('stratum-pool/lib/algoProperties.js');
 var util   = require('stratum-pool/lib/util.js');
 
-var Cryptsy  = require('./apiCryptsy.js');
-var Poloniex = require('./apiPoloniex.js');
-var Mintpal  = require('./apiMintpal.js');
-var Bittrex  = require('./apiBittrex.js');
 var Stratum  = require('stratum-pool');
 
 module.exports = function(logger){
-
     var _this = this;
 
     var portalConfig = JSON.parse(process.env.portalConfig);
     var poolConfigs = JSON.parse(process.env.pools);
-
     var logSystem = 'Profit';
 
     // 

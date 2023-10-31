@@ -1,24 +1,20 @@
-var events = require('events');
-var net = require('net');
+const events = require('events');
+const net = require('net');
 
-var listener = module.exports = function listener(port){
-
-    var _this = this;
-
-    var emitLog = function(text){
+const listener = module.exports = function listener(port){
+    const _this = this;
+    const emitLog = function(text){
         _this.emit('log', text);
     };
 
-
     this.start = function(){
         net.createServer(function(c) {
-
-            var data = '';
+            let data = '';
             try {
                 c.on('data', function (d) {
                     data += d;
                     if (data.slice(-1) === '\n') {
-                        var message = JSON.parse(data);
+                        const message = JSON.parse(data);
                         _this.emit('command', message.command, message.params, message.options, function(message){
                             c.end(message);
                         });
@@ -39,7 +35,6 @@ var listener = module.exports = function listener(port){
             emitLog('CLI listening on port ' + port)
         });
     }
-
 };
 
 listener.prototype.__proto__ = events.EventEmitter.prototype;

@@ -5,7 +5,6 @@ const Redis = require('ioredis');
 const Stratum = require('stratum-pool');
 const util = require('stratum-pool/lib/util.js');
 
-
 module.exports = function(logger){
     const poolConfigs = JSON.parse(process.env.pools);
     let enabledPools = [];
@@ -33,9 +32,7 @@ module.exports = function(logger){
             const poolOptions = poolConfigs[coin];
             const processingConfig = poolOptions.paymentProcessing;
             const logSystem = 'Payments';
-            const logComponent = coin;
-
-            logger.debug(logSystem, logComponent, 'Payment processing setup to run every '
+            logger.debug(logSystem, coin, 'Payment processing setup to run every '
                 + processingConfig.paymentInterval + ' second(s) with daemon ('
                 + processingConfig.daemon.user + '@' + processingConfig.daemon.host + ':' + processingConfig.daemon.port
                 + ') and redis (' + poolOptions.redis.host + ':' + poolOptions.redis.port + ')');
@@ -270,7 +267,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         }
                         return true;
                     };
-
 
                     //Filter out all rounds that are immature (not confirmed or orphaned yet)
                     rounds = rounds.filter(function(r){

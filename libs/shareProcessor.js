@@ -13,13 +13,32 @@ value: a hash with..
 
 module.exports = function(log, poolConfig){
     const coin = poolConfig.coin.name;
-    const rewardType = (poolConfig.type && ['pplns', 'solo'].includes(poolConfig.type))
-        ? poolConfig.type
-        : 'pplns';
+    const forkId = process.env.forkId;
+    const logSystem = 'Pool';
+    const logComponent = coin;
+    const logSubCat = 'Thread ' + (parseInt(forkId) + 1);
 
-    let pplns = 1;
+    const rewardType = poolConfig.type;
+    const pplns = rewardType === 'pplns' ? poolConfig.pplns : 1;
+
+    const defaultBaseShareDifficulty = 2;
+    let baseShareDifficulty;
+    let varDiffCfgFound = false;
+    for (const portCfg of Object.values(poolConfig.ports)) {
+        const portMinDiff = portCfg?.varDiff?.minDiff;
+        if (Number.isInteger(portMinDiff)) {
+            varDiffCfgFound = true;
+            if (!baseShareDifficulty || portMinDiff < baseShareDifficulty) {
+                baseShareDifficulty = portMinDiff;
+            }
+        }
+    }
     if (rewardType === 'pplns') {
-        pplns = (poolConfig.pplns && poolConfig.pplns > 1) ? poolConfig.pplns : 10000;
+        if (!varDiffCfgFound) {
+            baseShareDifficulty = defaultBaseShareDifficulty;
+            log.debug(logSystem, logComponent, logSubCat, `Vardiff cfg not found, using default baseShareDifficulty`);
+        }
+        log.debug(logSystem, logComponent, logSubCat, `Using baseShareDifficulty ${baseShareDifficulty}`);
     }
 
     const redisConfig = poolConfig.redis;
@@ -32,11 +51,6 @@ module.exports = function(log, poolConfig){
         maxRetriesPerRequest: 1,
         readTimeout: 5
     })
-
-    const forkId = process.env.forkId;
-    const logSystem = 'Pool';
-    const logComponent = coin;
-    const logSubCat = 'Thread ' + (parseInt(forkId) + 1);
 
     client.on('ready', function(){
         log.debug(logSystem, logComponent, logSubCat, 'Share processing setup with redis (' + redisConfig.host +
@@ -96,7 +110,7 @@ module.exports = function(log, poolConfig){
             redisCommands.push(['hincrbyfloat', `${baseName}:stats`, 'roundShares', shareData.difficulty]);
 
             if (rewardType !== 'solo') {
-                const baseShareDifficulty = 25000;
+                // const baseShareDifficulty = 8;
                 const times = Math.floor(shareData.difficulty / baseShareDifficulty);
 
                 for (let i = 0; i < times; ++i) {

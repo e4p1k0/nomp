@@ -1,8 +1,13 @@
-var Stratum = require('stratum-pool');
-var redis   = require('ioredis');
-var net     = require('net');
+const Stratum = require('stratum-pool');
+const redis   = require('ioredis');
+const net     = require('net');
 
-var ShareProcessor = require('./shareProcessor.js');
+const ShareProcessor = require('./shareProcessor.js');
+
+const defaultValues = {
+    type:   'pplns',
+    pplns:  10000
+};
 
 module.exports = function(logger){
 
@@ -96,6 +101,16 @@ module.exports = function(logger){
 
         var poolOptions = poolConfigs[coin];
 
+        //  set default values
+        if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
+            poolOptions.type = defaultValues.type; //  default
+            logger.debug(logSystem, logComponent, logSubCat, `Pool type is not set, using default: ${poolOptions.type}`);
+        }
+        if (poolOptions.type === 'pplns' && !poolOptions.pplns) {
+            poolOptions.pplns = defaultValues.pplns;  //  default
+        }
+        //  set default values end
+
         var logSystem = 'Pool';
         var logComponent = coin;
         var logSubCat = 'Thread ' + (parseInt(forkId) + 1);
@@ -149,7 +164,6 @@ module.exports = function(logger){
                 });
             });
         };
-
 
         var pool = Stratum.createPool(poolOptions, authorizeFN, logger);
         pool.on('share', function(isValidShare, isValidBlock, data){

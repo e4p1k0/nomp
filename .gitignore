@@ -5,3 +5,4 @@ pool_configs/*.json
 
 !pool_configs_examples/litecoin_example.json
 !pool_configs_examples/gm_example.json
+trash/

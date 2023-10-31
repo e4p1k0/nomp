@@ -2,7 +2,6 @@ var Stratum = require('stratum-pool');
 var redis   = require('ioredis');
 var net     = require('net');
 
-var MposCompatibility = require('./mposCompatibility.js');
 var ShareProcessor = require('./shareProcessor.js');
 
 module.exports = function(logger){
@@ -60,7 +59,7 @@ module.exports = function(logger){
                 var oldPool = pools[oldCoin];
                 var proxyPorts = Object.keys(proxySwitch[switchName].ports);
 
-                if (newCoin == oldCoin) {
+                if (newCoin === oldCoin) {
                     logger.debug(logSystem, logComponent, logSubCat, 'Switch message would have no effect - ignoring ' + newCoin);
                     break;
                 }
@@ -82,8 +81,7 @@ module.exports = function(logger){
                     redisClient.hset('proxyState', algo, newCoin, function(error, obj) {
                         if (error) {
                             logger.error(logSystem, logComponent, logSubCat, 'Redis error writing proxy config: ' + JSON.stringify(err))
-                        }
-                        else {
+                        } else {
                             logger.debug(logSystem, logComponent, logSubCat, 'Last proxy state saved to redis for ' + algo);
                         }
                     });
@@ -108,62 +106,40 @@ module.exports = function(logger){
             diff: function(){}
         };
 
-        //Functions required for MPOS compatibility
-        if (poolOptions.mposMode && poolOptions.mposMode.enabled){
-            var mposCompat = new MposCompatibility(logger, poolOptions);
+        var shareProcessor = new ShareProcessor(logger, poolOptions);
 
-            handlers.auth = function(port, workerName, password, authCallback){
-                mposCompat.handleAuth(workerName, password, authCallback);
-            };
-
-            handlers.share = function(isValidShare, isValidBlock, data){
-                mposCompat.handleShare(isValidShare, isValidBlock, data);
-            };
-
-            handlers.diff = function(workerName, diff){
-                mposCompat.handleDifficultyUpdate(workerName, diff);
-            }
-        }
-
-        //Functions required for internal payment processing
-        else{
-
-            var shareProcessor = new ShareProcessor(logger, poolOptions);
-
-            handlers.auth = function(port, workerName, password, authCallback){
-                if (poolOptions.validateWorkerUsername !== true)
-                    authCallback(true);
-                else {
-                    if (workerName.length === 40) {
-                        try {
-                            new Buffer(workerName, 'hex');
-                            authCallback(true);
-                        }
-                        catch (e) {
-                            authCallback(false);
-                        }
+        handlers.auth = function(port, workerName, password, authCallback){
+            if (poolOptions.validateWorkerUsername !== true)
+                authCallback(true);
+            else {
+                if (workerName.length === 40) {
+                    try {
+                        new Buffer(workerName, 'hex');
+                        authCallback(true);
                     }
-                    else {
-                        pool.daemon.cmd('validateaddress', [workerName], function (results) {
-                            var isValid = results.filter(function (r) {
-                                return r.response.isvalid
-                            }).length > 0;
-                            authCallback(isValid);
-                        });
+                    catch (e) {
+                        authCallback(false);
                     }
-
                 }
-            };
+                else {
+                    pool.daemon.cmd('validateaddress', [workerName], function (results) {
+                        var isValid = results.filter(function (r) {
+                            return r.response.isvalid
+                        }).length > 0;
+                        authCallback(isValid);
+                    });
+                }
 
-            handlers.share = function(isValidShare, isValidBlock, data){
-                shareProcessor.handleShare(isValidShare, isValidBlock, data);
-            };
-        }
+            }
+        };
+
+        handlers.share = function(isValidShare, isValidBlock, data){
+            shareProcessor.handleShare(isValidShare, isValidBlock, data);
+        };
 
         var authorizeFN = function (ip, port, workerName, password, callback) {
             handlers.auth(port, workerName, password, function(authorized){
-
-                var authString = authorized ? 'Authorized' : 'Unauthorized ';
+                const authString = authorized ? 'Authorized' : 'Unauthorized ';
 
                 logger.debug(logSystem, logComponent, logSubCat, authString + ' ' + workerName + ':' + password + ' [' + ip + ']');
                 callback({
@@ -250,12 +226,8 @@ module.exports = function(logger){
             // defaults for the standard config of the coin.
             //
             Object.keys(portalConfig.switching).forEach(function(switchName) {
-
                 var algorithm = portalConfig.switching[switchName].algorithm;
-
                 if (!portalConfig.switching[switchName].enabled) return;
-
-
                 var initalPool = proxyState.hasOwnProperty(algorithm) ? proxyState[algorithm] : _this.getFirstPoolForAlgorithm(algorithm);
                 proxySwitch[switchName] = {
                     algorithm: algorithm,
@@ -263,7 +235,6 @@ module.exports = function(logger){
                     currentPool: initalPool,
                     servers: []
                 };
-
 
                 Object.keys(proxySwitch[switchName].ports).forEach(function(port){
                     var f = net.createServer(function(socket) {
@@ -295,7 +266,7 @@ module.exports = function(logger){
     this.getFirstPoolForAlgorithm = function(algorithm) {
         var foundCoin = "";
         Object.keys(poolConfigs).forEach(function(coinName) {
-            if (poolConfigs[coinName].coin.algorithm == algorithm) {
+            if (poolConfigs[coinName].coin.algorithm === algorithm) {
                 if (foundCoin === "")
                     foundCoin = coinName;
             }
@@ -308,9 +279,7 @@ module.exports = function(logger){
     // configuation for any proxy switching ports configured into the stratum pool object.
     //
     this.setDifficultyForProxyPort = function(pool, coin, algo) {
-
         logger.debug(logSystem, logComponent, algo, 'Setting proxy difficulties after pool start');
-
         Object.keys(portalConfig.switching).forEach(function(switchName) {
             if (!portalConfig.switching[switchName].enabled) return;
 

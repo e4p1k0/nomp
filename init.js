@@ -2,8 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const cluster = require('cluster');
-
-const async = require('async');
 const extend = require('extend');
 
 const PoolLogger = require('./libs/logUtil.js');
@@ -12,7 +10,7 @@ const PoolWorker = require('./libs/poolWorker.js');
 const PaymentProcessor = require('./libs/paymentProcessor.js');
 const Website = require('./libs/website.js');
 
-let algos = require('stratum-pool/lib/algoProperties.js');
+const algos = require('stratum-pool/lib/algoProperties.js');
 
 JSON.minify = JSON.minify || require("node-json-minify");
 
@@ -29,14 +27,8 @@ let logger = new PoolLogger({
     logColors: portalConfig.logColors
 });
 
-try {
-    require('newrelic');
-    if (cluster.isMaster)
-        logger.debug('NewRelic', 'Monitor', 'New Relic initiated');
-} catch(e) {}
-
 //Try to give process ability to handle 100k concurrent connections
-try{
+try {
     let posix = require('posix');
     try {
         posix.setrlimit('nofile', { soft: 100000, hard: 100000 });
@@ -55,13 +47,12 @@ try{
         }
     }
 }
-catch(e){
+catch(e) {
     if (cluster.isMaster)
         logger.debug('POSIX', 'Connection Limit', '(Safe to ignore) POSIX module not installed and resource (connection) limit was not raised');
 }
 
 if (cluster.isWorker){
-
     switch(process.env.workerType){
         case 'pool':
             new PoolWorker(logger);
@@ -72,21 +63,16 @@ if (cluster.isWorker){
         case 'website':
             new Website(logger);
             break;
-        case 'profitSwitch':
-            new ProfitSwitch(logger);
-            break;
     }
 
     return;
 } 
-
 
 //Read all pool configs from pool_configs and join them with their coin profile
 const buildPoolConfigs = function(){
     const configDir = 'pool_configs/';
     let configs = {};
     let poolConfigFiles = [];
-
 
     /* Get filenames of pool config json files that are enabled */
     fs.readdirSync(configDir).forEach(function(file){
@@ -96,7 +82,6 @@ const buildPoolConfigs = function(){
         poolOptions.fileName = file;
         poolConfigFiles.push(poolOptions);
     });
-
 
     /* Ensure no pool uses any of the same ports as another pool */
     for (let i = 0; i < poolConfigFiles.length; i++){
@@ -120,7 +105,6 @@ const buildPoolConfigs = function(){
 
         }
     }
-
 
     poolConfigFiles.forEach(function(poolOptions){
         poolOptions.coinFileName = poolOptions.coin;

@@ -130,8 +130,10 @@ module.exports = function(log, poolConfig){
            doesn't overwrite an existing entry, and timestamp as score lets us query shares from last X minutes to
            generate hashrate for each worker and pool. */
         const dateNow = Date.now();
+        const dateNowMs = Math.round(dateNow / 1000);
         const hashrateData = [ isValidShare ? shareData.difficulty : -shareData.difficulty, shareData.worker, dateNow];
         redisCommands.push(['zadd', coin + ':hashrate', dateNow / 1000 | 0, hashrateData.join(':')]);
+        redisCommands.push(['hset', `${baseName}:miners:${shareData.worker}`, 'lastShare', dateNowMs]);
 
         if (isValidBlock) {
             redisCommands.push(['rename', coin + ':shares:roundCurrent', coin + ':shares:round' + shareData.height]);                       //  we need it?
@@ -141,9 +143,10 @@ module.exports = function(log, poolConfig){
             redisCommands.push(['hincrby', coin + ':stats', 'invalidBlocks', 1]);
         }
 
+
         //  CHECK!
         if (isValidBlock) {
-            redisCommands.push(['hset', `${baseName}:stats`, `lastBlockFound`, Date.now()]);
+            redisCommands.push(['hset', `${baseName}:stats`, `lastBlockFound`, dateNowMs]);
 
             if (rewardType === 'pplns') {
                 redisCommands.push(['lrange', `${baseName}:lastShares`, 0, pplns]);
@@ -167,8 +170,8 @@ module.exports = function(log, poolConfig){
                     // let totalScore = 0;
                     // let totalShares = 0;
                     if (rewardType === 'solo') {
-                        redisCommands2.push(['hdel', `${coin}:workers:${shareData.worker}`, 'soloShares']);
-                        redisCommands2.push(['hincrby', `${coin}:workers:${shareData.worker}`, 'soloBlocksFound', 1]);
+                        redisCommands2.push(['hdel', `${baseName}:workers:${shareData.worker}`, 'soloShares']);
+                        redisCommands2.push(['hincrby', `${baseName}:workers:${shareData.worker}`, 'soloBlocksFound', 1]);
                     } else if (rewardType === 'pplns') {
                         const pplnsShares = replies[replies.length - 2];
                         let totalSharesArr = [];
@@ -182,9 +185,8 @@ module.exports = function(log, poolConfig){
                         }
 
                         for (const miner in totalSharesArr) {
-                            redisCommands2.push(['hincrby', `${coin}:shares:round${shareData.height}`, miner, totalSharesArr[miner]]);
+                            redisCommands2.push(['hincrby', `${baseName}:shares:round${shareData.height}`, miner, totalSharesArr[miner]]);
                         }
-
                     }
 
                     redisCommands2.push(['zadd', `${baseName}:blocks:candidates`, shareData.height,

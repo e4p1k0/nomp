@@ -1,4 +1,3 @@
-const fs = require('fs');
 const async = require('async');
 const Redis = require('ioredis');
 const algos = require('stratum-pool/lib/algoProperties')
@@ -201,7 +200,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
         readTimeout: 5
     })
 
-    processingConfig.apiInterval = 120;   // Setup LATER
+    processingConfig.apiInterval = 7;   // Setup LATER
     setInterval(function(){
         try {
             ProcessApi();
@@ -303,28 +302,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
 
                     callback();
                 });
-            },
-            function(totalHashrate, totalHashrateAvg, miners, callback){
-                    let redisCommands = [
-                        ['zadd', coin + ':charts:pool', nowMs, [totalHashrate, totalHashrateAvg].join(':')]
-                    ];
-
-                    for (let miner in miners) {
-                        redisCommands.push(['zadd', coin + ':charts:miners:' + miner, nowMs,
-                            [miners[miner].hashrate, miners[miner].hashrateAvg].join(':')]);
-                    }
-
-                    startRedisTimer();
-                    redisClient.multi(redisCommands).exec(function(error, results){
-                        endRedisTimer();
-                        if (error) {
-                            callback('API loop ended - redis error with multi write charts data');
-                            return;
-                        }
-
-                        callback();
-                    });
-                }],
+            }],
             function () {
                 const apiProcessTime = Date.now() - startApiProcess;
                 logger.debug(logSystem, logComponent, 'Finished interval - time spent: '

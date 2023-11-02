@@ -89,12 +89,16 @@ module.exports = function(log, poolConfig){
     });
 
     this.handleShare = function(isValidShare, isValidBlock, shareData){
+        if (!isValidShare) {
+            return;
+        }
+
+        // console.log('I`m in nomp, shareProcessor, handleShare:', shareData)
         // shareData
         // {
         //     job: '5',
         //     ip: '::ffff:81.177.74.130',
         //     port: 3031,
-        //     worker: 'GJK9gjntGMR3sQENuhNL99t6gkx2ct5xvb',
         //     height: 22012,
         //     blockReward: 300000000000,
         //     difficulty: 32,
@@ -102,120 +106,100 @@ module.exports = function(log, poolConfig){
         //     blockDiff: 125303.470650112,
         //     blockDiffActual: 489.466682227,
         //     blockHash: undefined,
-        //     blockHashInvalid: undefined
+        //     blockHashInvalid: undefined,
+        //     login: 'GJK9gjntGMR3sQENuhNL99t6gkx2ct5xvb',
+        //     worker: 'testtest',
+        
         // }
         let redisCommands = [];
 
-        if (isValidShare) {
-            redisCommands.push(['hincrbyfloat', `${baseName}:stats`, 'roundShares', shareData.difficulty]);
+        redisCommands.push(['hincrbyfloat', `${baseName}:stats`, 'roundShares', shareData.difficulty]);
 
-            if (rewardType !== 'solo') {
-                // const baseShareDifficulty = 8;
-                const times = Math.floor(shareData.difficulty / baseShareDifficulty);
+        if (rewardType !== 'solo') {
+            const times = Math.floor(shareData.difficulty / baseShareDifficulty);
 
-                for (let i = 0; i < times; ++i) {
-                    redisCommands.push(['lpush', `${baseName}:lastShares`, shareData.worker]);
-                }
-                redisCommands.push(['ltrim', `${baseName}:lastShares`, 0, pplns - 1]);
-            } else {
-                redisCommands.push(['hincrbyfloat', `${baseName}:workers:${shareData.worker}`, 'soloShares', shareData.difficulty]);
+            for (let i = 0; i < times; ++i) {
+                redisCommands.push(['lpush', `${baseName}:lastShares`, shareData.login]);
             }
-
-            redisCommands.push(['hincrbyfloat', baseName + ':shares:roundCurrent', shareData.worker, shareData.difficulty]);                //  we need it?
-            redisCommands.push(['hincrby', baseName + ':stats', 'validShares', 1]);                                                         //  we need it?
+            redisCommands.push(['ltrim', `${baseName}:lastShares`, 0, pplns - 1]);
         } else {
-            redisCommands.push(['hincrby', baseName + ':stats', 'invalidShares', 1]);                                                       //  we need it?
+            redisCommands.push(['hincrbyfloat', `${baseName}:workers:${shareData.login}`, 'soloShares', shareData.difficulty]);
         }
-        /* Stores share diff, worker, and unique value with a score that is the timestamp. Unique value ensures it
-           doesn't overwrite an existing entry, and timestamp as score lets us query shares from last X minutes to
-           generate hashrate for each worker and pool. */
+
         const dateNow = Date.now();
         const dateNowMs = Math.round(dateNow / 1000);
-        const hashrateData = [ isValidShare ? shareData.difficulty : -shareData.difficulty, shareData.worker, dateNow];
-        redisCommands.push(['zadd', coin + ':hashrate', dateNow / 1000 | 0, hashrateData.join(':')]);
-        redisCommands.push(['hset', `${baseName}:miners:${shareData.worker}`, 'lastShare', dateNowMs]);
+        const hashrateData = [ isValidShare ? shareData.difficulty : -shareData.difficulty, shareData.login, shareData.worker, dateNow];
+        redisCommands.push(['zadd', coin + ':hashrate', dateNowMs, hashrateData.join(':')]);
+        redisCommands.push(['zadd', coin + ':hashrate:miners:' + shareData.login, dateNowMs, hashrateData.join(':')]);
+        redisCommands.push(['hset', `${baseName}:miners:${shareData.login}`, 'lastShare', dateNowMs]);
 
         if (isValidBlock) {
-            redisCommands.push(['rename', coin + ':shares:roundCurrent', coin + ':shares:round' + shareData.height]);                       //  we need it?
-            redisCommands.push(['sadd', coin + ':blocksPending', [shareData.blockHash, shareData.txHash, shareData.height].join(':')]);
-            redisCommands.push(['hincrby', coin + ':stats', 'validBlocks', 1]);
-        } else if (shareData.blockHash) {
-            redisCommands.push(['hincrby', coin + ':stats', 'invalidBlocks', 1]);
-        }
-
-
-        //  CHECK!
-        if (isValidBlock) {
+            // redisCommands.push(['sadd', coin + ':blocksPending', [shareData.blockHash, shareData.txHash, shareData.height].join(':')]);
+            // redisCommands.push(['hincrby', coin + ':stats', 'validBlocks', 1]);
             redisCommands.push(['hset', `${baseName}:stats`, `lastBlockFound`, dateNowMs]);
 
             if (rewardType === 'pplns') {
                 redisCommands.push(['lrange', `${baseName}:lastShares`, 0, pplns]);
                 redisCommands.push(['hget', `${baseName}:stats`, 'roundShares']);
             } else if (rewardType === 'solo') {
-                redisCommands.push(['hget', `${baseName}:workers:${shareData.worker}`, 'soloShares']);
+                redisCommands.push(['hget', `${baseName}:workers:${shareData.login}`, 'soloShares']);
             }
+        // } else if (shareData.blockHash) {
+        //     redisCommands.push(['hincrby', coin + ':stats', 'invalidBlocks', 1]);
         }
-        //  CHECK!
-        // console.log('redisCommands', redisCommands)
-        client.multi(redisCommands)
-            .exec(function (err, replies) {
-                if (err) {
-                    log.error(logSystem, logComponent, logSubCat, `Error(1) failed to insert share data into redis:\n${JSON.stringify(redisCommands)}\n${JSON.stringify(err)}`);
-                    return;
-                }
 
-                if (isValidBlock) {
-                    let redisCommands2 = [];
-                    const totalShares = replies[replies.length - 1];
-                    // let totalScore = 0;
-                    // let totalShares = 0;
-                    if (rewardType === 'solo') {
-                        redisCommands2.push(['hdel', `${baseName}:workers:${shareData.worker}`, 'soloShares']);
-                        redisCommands2.push(['hincrby', `${baseName}:workers:${shareData.worker}`, 'soloBlocksFound', 1]);
-                    } else if (rewardType === 'pplns') {
-                        const pplnsShares = replies[replies.length - 2];
-                        let totalSharesArr = [];
+        client.multi(redisCommands).exec(function (err, replies) {
+            if (err) {
+                log.error(logSystem, logComponent, logSubCat, `Error(1) failed to insert share data into redis:\n${JSON.stringify(redisCommands)}\n${JSON.stringify(err)}`);
+                return;
+            }
 
-                        for (const miner of pplnsShares) {
-                            if (!totalSharesArr[miner]) {
-                                totalSharesArr[miner] = 1;
-                            } else {
-                                ++totalSharesArr[miner];
-                            }
-                        }
+            if (isValidBlock) {
+                let redisCommands2 = [];
+                // console.log('replies', replies)
+                const totalShares = replies[replies.length - 1][1];
+                // let totalScore = 0;
+                // let totalShares = 0;
+                if (rewardType === 'solo') {
+                    redisCommands2.push(['hdel', `${baseName}:workers:${shareData.login}`, 'soloShares']);
+                    redisCommands2.push(['hincrby', `${baseName}:workers:${shareData.login}`, 'soloBlocksFound', 1]);
+                } else if (rewardType === 'pplns') {
+                    const pplnsShares = replies[replies.length - 2][1];
+                    let totalSharesArr = [];
 
-                        for (const miner in totalSharesArr) {
-                            redisCommands2.push(['hincrby', `${baseName}:shares:round${shareData.height}`, miner, totalSharesArr[miner]]);
+                    for (const miner of pplnsShares) {
+                        if (!totalSharesArr[miner]) {
+                            totalSharesArr[miner] = 1;
+                        } else {
+                            ++totalSharesArr[miner];
                         }
                     }
 
-                    redisCommands2.push(['zadd', `${baseName}:blocks:candidates`, shareData.height,
-                        [
-                            rewardType,
-                            shareData.worker,
-                            shareData.blockHash,
-                            shareData.txHash,
-                            Date.now() / 1000 | 0,
-                            shareData.blockDiff,
-                            totalShares
-                        ].join(':')]
-                    );
-
-                    client.multi(redisCommands2)
-                        .exec(function (err, replies) {
-                            if (err) {
-                                log.error(logSystem, logComponent, logSubCat, `Error(2) failed to insert share data into redis:\n${JSON.stringify(redisCommands)}\n${JSON.stringify(err)}`);
-                                // return;
-                            }
-                        })
+                    for (const miner in totalSharesArr) {
+                        redisCommands2.push(['hincrby', `${baseName}:shares:pplnsRound${shareData.height}`, miner, totalSharesArr[miner]]);
+                    }
                 }
-            });
-        //  double check end
 
-        // client.multi(redisCommands).exec(function(err, replies){
-        //     if (err)
-        //         log.error(logSystem, logComponent, logSubCat, 'Error with share processor multi ' + JSON.stringify(err));
-        // })
+                redisCommands2.push(['zadd', `${baseName}:blocks:candidates`, shareData.height,
+                    [
+                        rewardType,
+                        shareData.login,
+                        shareData.blockHash,
+                        shareData.txHash,
+                        Date.now() / 1000 | 0,
+                        shareData.blockDiff,
+                        totalShares,
+                        shareData.blockReward
+                    ].join(':')]
+                );
 
+                client.multi(redisCommands2).exec(function (err, replies) {
+                    if (err) {
+                        log.error(logSystem, logComponent, logSubCat, `Error(2) failed to insert share data into redis:\n${JSON.stringify(redisCommands)}\n${JSON.stringify(err)}`);
+                        // return;
+                    }
+                })
+            }
+        });
     };
 };

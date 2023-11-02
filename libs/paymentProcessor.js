@@ -25,9 +25,6 @@ module.exports = function(logger){
             console.log('error', error)
         }
 
-        //  in old async ver
-        // console.log('coins', coins)
-        // coins [ 'goodmorning' ]
         coins.forEach(function(coin){
             const poolOptions = poolConfigs[coin];
             const processingConfig = poolOptions.paymentProcessing;
@@ -160,12 +157,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 startRedisTimer();
                 redisClient.multi([
                     ['hgetall', coin + ':balances'],
-                    ['smembers', coin + ':blocksPending'],
                     ['zrangebyscore', coin + ':blocks:candidates', 0, '+inf', 'WITHSCORES']
                 ]).exec(function(error, results){
-                    // console.log('coin', coin)
-                    // console.log('error', error)
-                    console.log('results', results)
                     endRedisTimer();
 
                     if (error) {
@@ -189,7 +182,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     //     };
                     // });
 
-                    let rawCandidates = results[2][1];
+                    let rawCandidates = results[1][1];
                     let rounds = [];
                     for (let i = 0; i < rawCandidates.length - 1; i = i + 2) {
                         const rawCandidateStr = rawCandidates[i];
@@ -212,12 +205,9 @@ function SetupForPool(logger, poolOptions, setupFinished){
             /* Does a batch rpc call to daemon with all the transaction hashes to see if they are confirmed yet.
                It also adds the block reward amount to the round object - which the daemon gives also gives us. */
             function(workers, rounds, callback){
-                console.log('nextFunc')
                 let batchRPCcommand = rounds.map(function(r){
                     return ['gettransaction', [r.txHash]];
                 });
-
-                console.log('batchRPCcommand', batchRPCcommand)
 
                 batchRPCcommand.push(['getaccount', [poolOptions.address]]);
 
@@ -313,7 +303,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
             /* Does a batch redis call to get shares contributed to each round. Then calculates the reward
                amount owned to each miner for each round. */
             function(workers, rounds, addressAccount, callback){
-                console.log('nextNEXt func')
                 const shareLookups = rounds.map(function(r){
                     return ['hgetall', coin + ':shares:round' + r.height]
                 });
@@ -321,6 +310,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 startRedisTimer();
                 redisClient.multi(shareLookups).exec(function(error, allWorkerShares){
                     endRedisTimer();
+                    console.log('allWorkerShares', allWorkerShares)
 
                     if (error){
                         callback('Check finished - redis error with multi get rounds share');
@@ -372,6 +362,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
              if not sending the balance, the differnce should be +(the amount they earned this round)
              */
             function(workers, rounds, addressAccount, callback) {
+                console.log('payments STOPPED')
+                return;
                 const trySend = function (withholdPercent) {
                     let addressAmounts = {};
                     let totalSent = 0;
@@ -447,28 +439,20 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 let roundsToDelete = [];
                 let orphanMergeCommands = [];
 
-                const moveSharesToCurrent = function(r){
-                    const workerShares = r.workerShares;
-                    Object.keys(workerShares).forEach(function(worker){
-                        orphanMergeCommands.push(['hincrby', coin + ':shares:roundCurrent',
-                            worker, workerShares[worker]]);
-                    });
-                };
-
                 rounds.forEach(function(r){
                     switch(r.category){
                         case 'kicked':
-                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksKicked', r.serialized]);
+                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksKicked', `${r.serialized}:2`]);
                         case 'orphan':
-                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksOrphaned', r.serialized]);
+                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksOrphaned', `${r.serialized}:1`]);
                             if (r.canDeleteShares){
-                                moveSharesToCurrent(r);
-                                roundsToDelete.push(coin + ':shares:round' + r.height);
+                                // moveSharesToCurrent(r);
+                                // roundsToDelete.push(coin + ':shares:round' + r.height);
                             }
                             return;
                         case 'generate':
-                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocksConfirmed', r.serialized]);
-                            roundsToDelete.push(coin + ':shares:round' + r.height);
+                            movePendingCommands.push(['smove', coin + ':blocksPending', coin + ':blocks:matured', `${r.serialized}:0`]);
+                            // roundsToDelete.push(coin + ':shares:round' + r.height);
                             return;
                     }
                 });

@@ -98,8 +98,7 @@ module.exports = function(logger){
 
 
     Object.keys(poolConfigs).forEach(function(coin) {
-
-        var poolOptions = poolConfigs[coin];
+        let poolOptions = poolConfigs[coin];
 
         //  set default values
         if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
@@ -123,21 +122,20 @@ module.exports = function(logger){
 
         var shareProcessor = new ShareProcessor(logger, poolOptions);
 
-        handlers.auth = function(port, workerName, password, authCallback){
+        handlers.auth = function(port, login, password, authCallback){
             if (poolOptions.validateWorkerUsername !== true)
                 authCallback(true);
             else {
-                if (workerName.length === 40) {
+                if (login.length === 40) {
                     try {
-                        new Buffer(workerName, 'hex');
+                        new Buffer(login, 'hex');
                         authCallback(true);
                     }
                     catch (e) {
                         authCallback(false);
                     }
-                }
-                else {
-                    pool.daemon.cmd('validateaddress', [workerName], function (results) {
+                } else {
+                    pool.daemon.cmd('validateaddress', [login], function (results) {
                         var isValid = results.filter(function (r) {
                             return r.response.isvalid
                         }).length > 0;
@@ -152,11 +150,11 @@ module.exports = function(logger){
             shareProcessor.handleShare(isValidShare, isValidBlock, data);
         };
 
-        var authorizeFN = function (ip, port, workerName, password, callback) {
-            handlers.auth(port, workerName, password, function(authorized){
+        var authorizeFN = function (ip, port, login, password, callback) {
+            handlers.auth(port, login, password, function(authorized){
                 const authString = authorized ? 'Authorized' : 'Unauthorized ';
 
-                logger.debug(logSystem, logComponent, logSubCat, authString + ' ' + workerName + ':' + password + ' [' + ip + ']');
+                logger.debug(logSystem, logComponent, logSubCat, authString + ' ' + login + ':' + password + ' [' + ip + ']');
                 callback({
                     error: null,
                     authorized: authorized,
@@ -167,31 +165,44 @@ module.exports = function(logger){
 
         var pool = Stratum.createPool(poolOptions, authorizeFN, logger);
         pool.on('share', function(isValidShare, isValidBlock, data){
-
             var shareData = JSON.stringify(data);
+            // job: '1',
+            // ip: '::ffff:81.177.74.130',
+            // port: 3031,
+            // height: 26114,
+            // blockReward: 300080000000,
+            // difficulty: 8,
+            // shareDiff: '19.13993564',
+            // blockDiff: 93126.51531904,
+            // blockDiffActual: 363.775450465,
+            // blockHash: undefined,
+            // blockHashInvalid: undefined,
+            // login: 'GJK9gjntGMR3sQENuhNL99t6gkx2ct5xvb',
+            // worker: 'Laptop4'
 
             if (data.blockHash && !isValidBlock)
                 logger.debug(logSystem, logComponent, logSubCat, 'We thought a block was found but it was rejected by the daemon, share data: ' + shareData);
 
             else if (isValidBlock)
-                logger.debug(logSystem, logComponent, logSubCat, 'Block found: ' + data.blockHash + ' by ' + data.worker);
+                logger.debug(logSystem, logComponent, logSubCat, `Block found: ${data.blockHash} by ${data.login}/${data.worker}`);
 
             if (isValidShare) {
                 if(data.shareDiff > 1000000000)
                     logger.debug(logSystem, logComponent, logSubCat, 'Share was found with diff higher than 1.000.000.000!');
                 else if(data.shareDiff > 1000000)
                     logger.debug(logSystem, logComponent, logSubCat, 'Share was found with diff higher than 1.000.000!');
-                logger.debug(logSystem, logComponent, logSubCat, 'Share accepted at diff ' + data.difficulty + '/' + data.shareDiff + ' by ' + data.worker + ' [' + data.ip + ']' );
+                logger.debug(logSystem, logComponent, logSubCat, `✔️ ${data.difficulty}/${data.shareDiff} by ${data.login}.${data.worker} [${data.ip}]`);
 
-            } else if (!isValidShare)
+            } else if (!isValidShare) {
                 logger.debug(logSystem, logComponent, logSubCat, 'Share rejected: ' + shareData);
+                console.log(data)
+            }
 
             handlers.share(isValidShare, isValidBlock, data)
 
-
-        }).on('difficultyUpdate', function(workerName, diff){
-            logger.debug(logSystem, logComponent, logSubCat, 'Difficulty update to diff ' + diff + ' workerName=' + JSON.stringify(workerName));
-            handlers.diff(workerName, diff);
+        }).on('difficultyUpdate', function(fullLogin, diff){
+            logger.debug(logSystem, logComponent, logSubCat, 'Difficulty update to diff ' + diff + ' ' + JSON.stringify(fullLogin));
+            handlers.diff(fullLogin, diff);
         }).on('log', function(severity, text) {
             logger[severity](logSystem, logComponent, logSubCat, text);
         }).on('banIP', function(ip, worker){
@@ -206,7 +217,6 @@ module.exports = function(logger){
 
 
     if (portalConfig.switching) {
-
         var logSystem = 'Switching';
         var logComponent = 'Setup';
         var logSubCat = 'Thread ' + (parseInt(forkId) + 1);

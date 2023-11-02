@@ -9,6 +9,7 @@ const CliListener = require('./libs/cliListener.js');
 const PoolWorker = require('./libs/poolWorker.js');
 const PaymentProcessor = require('./libs/paymentProcessor.js');
 const Website = require('./libs/website.js');
+const PoolApi = require('./libs/poolApi.js');
 
 const algos = require('stratum-pool/lib/algoProperties.js');
 
@@ -62,6 +63,9 @@ if (cluster.isWorker){
             break;
         case 'website':
             new Website(logger);
+            break;
+        case 'poolApi':
+            new PoolApi(logger);
             break;
     }
 
@@ -235,9 +239,6 @@ var startCliListener = function(){
                 });
                 reply('Pool workers notified');
                 break;
-            case 'coinswitch':
-                processCoinSwitchCommand(params, options, reply);
-                break;
             case 'reloadpool':
                 Object.keys(cluster.workers).forEach(function(id) {
                     cluster.workers[id].send({type: 'reloadpool', coin: params[0] });
@@ -249,73 +250,6 @@ var startCliListener = function(){
                 break;
         }
     }).start();
-};
-
-const processCoinSwitchCommand = function(params, options, reply){
-    const logSystem = 'CLI';
-    const logComponent = 'coinswitch';
-
-    const replyError = function(msg){
-        reply(msg);
-        logger.error(logSystem, logComponent, msg);
-    };
-
-    if (!params[0]) {
-        replyError('Coin name required');
-        return;
-    }
-
-    if (!params[1] && !options.algorithm){
-        replyError('If switch key is not provided then algorithm options must be specified');
-        return;
-    }
-    else if (params[1] && !portalConfig.switching[params[1]]){
-        replyError('Switch key not recognized: ' + params[1]);
-        return;
-    }
-    else if (options.algorithm && !Object.keys(portalConfig.switching).filter(function(s){
-        return portalConfig.switching[s].algorithm === options.algorithm;
-    })[0]){
-        replyError('No switching options contain the algorithm ' + options.algorithm);
-        return;
-    }
-
-    const messageCoin = params[0].toLowerCase();
-    const newCoin = Object.keys(poolConfigs).filter(function(p){
-        return p.toLowerCase() === messageCoin;
-    })[0];
-
-    if (!newCoin){
-        replyError('Switch message to coin that is not recognized: ' + messageCoin);
-        return;
-    }
-
-    let switchNames = [];
-
-    if (params[1]) {
-        switchNames.push(params[1]);
-    } else {
-        for (var name in portalConfig.switching){
-            if (portalConfig.switching[name].enabled && portalConfig.switching[name].algorithm === options.algorithm)
-                switchNames.push(name);
-        }
-    }
-
-    switchNames.forEach(function(name){
-        if (poolConfigs[newCoin].coin.algorithm !== portalConfig.switching[name].algorithm){
-            replyError('Cannot switch a '
-                + portalConfig.switching[name].algorithm
-                + ' algo pool to coin ' + newCoin + ' with ' + poolConfigs[newCoin].coin.algorithm + ' algo');
-            return;
-        }
-
-        Object.keys(cluster.workers).forEach(function (id) {
-            cluster.workers[id].send({type: 'coinswitch', coin: newCoin, switchName: name });
-        });
-    });
-
-    reply('Switch message sent to pool workers');
-
 };
 
 const startPaymentProcessor = function(){
@@ -361,11 +295,29 @@ const startWebsite = function(){
     });
 };
 
+const startPoolApi = function(){
+    //  check later
+    // if (!portalConfig.poolApi.enabled) return;
+
+    const worker = cluster.fork({
+        workerType: 'poolApi',
+        pools: JSON.stringify(poolConfigs),
+        portalConfig: JSON.stringify(portalConfig)
+    });
+    worker.on('exit', function(code, signal){
+        logger.error('Master', 'PoolApi', `Pool API process died (code ${code}, signal ${signal}), spawning replacement...`);
+        setTimeout(function(){
+            startPoolApi(portalConfig, poolConfigs);
+        }, 2000);
+    });
+};
+
 (function init(){
     poolConfigs = buildPoolConfigs();
 
     spawnPoolWorkers();
     startPaymentProcessor();
     startWebsite();
+    startPoolApi();
     startCliListener();
 })();

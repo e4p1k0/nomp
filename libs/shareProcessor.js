@@ -191,6 +191,7 @@ module.exports = function(log, poolConfig){
                         totalShares,
                     ].join(':')]
                 );
+                redisCommands2.push(['hdel', `${baseName}:stats`, 'roundShares']);
 
                 client.multi(redisCommands2).exec(function (err, replies) {
                     if (err) {

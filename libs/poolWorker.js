@@ -4,11 +4,6 @@ const net     = require('net');
 
 const ShareProcessor = require('./shareProcessor.js');
 
-const defaultValues = {
-    type:   'pplns',
-    pplns:  10000
-};
-
 module.exports = function(logger){
 
     var _this = this;
@@ -96,20 +91,8 @@ module.exports = function(logger){
         }
     });
 
-
     Object.keys(poolConfigs).forEach(function(coin) {
         let poolOptions = poolConfigs[coin];
-
-        //  set default values
-        if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
-            poolOptions.type = defaultValues.type; //  default
-            logger.debug(logSystem, logComponent, logSubCat, `Pool type is not set, using default: ${poolOptions.type}`);
-        }
-        if (poolOptions.type === 'pplns' && !poolOptions.pplns) {
-            poolOptions.pplns = defaultValues.pplns;  //  default
-        }
-        //  set default values end
-
         var logSystem = 'Pool';
         var logComponent = coin;
         var logSubCat = 'Thread ' + (parseInt(forkId) + 1);

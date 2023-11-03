@@ -7,7 +7,7 @@ const extend = require('extend');
 const PoolLogger = require('./libs/logUtil.js');
 const CliListener = require('./libs/cliListener.js');
 const PoolWorker = require('./libs/poolWorker.js');
-const PaymentProcessor = require('./libs/paymentProcessor.js');
+const BlockUnlocker = require('./libs/blockUnlocker.js');
 const Website = require('./libs/website.js');
 const PoolApi = require('./libs/poolApi.js');
 
@@ -21,6 +21,12 @@ if (!fs.existsSync('config.json')){
 }
 
 const portalConfig = JSON.parse(JSON.minify(fs.readFileSync("config.json", {encoding: 'utf8'})));
+
+const defaultValues = {
+    type:   'pplns',
+    pplns:  10000
+};
+
 let poolConfigs;
 
 let logger = new PoolLogger({
@@ -28,7 +34,7 @@ let logger = new PoolLogger({
     logColors: portalConfig.logColors
 });
 
-//Try to give process ability to handle 100k concurrent connections
+//  Try to give process ability to handle 100k concurrent connections
 try {
     let posix = require('posix');
     try {
@@ -58,8 +64,8 @@ if (cluster.isWorker){
         case 'pool':
             new PoolWorker(logger);
             break;
-        case 'paymentProcessor':
-            new PaymentProcessor(logger);
+        case 'blockUnlocker':
+            new BlockUnlocker(logger);
             break;
         case 'website':
             new Website(logger);
@@ -72,7 +78,7 @@ if (cluster.isWorker){
     return;
 } 
 
-//Read all pool configs from pool_configs and join them with their coin profile
+//  Read all pool configs from pool_configs and join them with their coin profile
 const buildPoolConfigs = function(){
     const configDir = 'pool_configs/';
     let configs = {};
@@ -153,6 +159,17 @@ const buildPoolConfigs = function(){
             logger.error('Master', coinProfile.name, 'Cannot run a pool for unsupported algorithm "' + coinProfile.algorithm + '"');
             delete configs[poolOptions.coin.name];
         }
+
+        //  set default values
+        if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
+            poolOptions.type = defaultValues.type; //  default
+            logger.debug(logSystem, logComponent, logSubCat, `Pool type is not set, using default: ${poolOptions.type}`);
+        }
+        if (poolOptions.type === 'pplns' && !poolOptions.pplns) {
+            poolOptions.pplns = defaultValues.pplns;  //  default
+        }
+        //  set default values end
+
 
     });
     return configs;
@@ -252,7 +269,7 @@ var startCliListener = function(){
     }).start();
 };
 
-const startPaymentProcessor = function(){
+const startBlockUnlocker = function(){
     let enabledForAny = false;
     for (const pool in poolConfigs){
         const p = poolConfigs[pool];
@@ -267,14 +284,14 @@ const startPaymentProcessor = function(){
         return;
 
     const worker = cluster.fork({
-        workerType: 'paymentProcessor',
+        workerType: 'blockUnlocker',
         pools: JSON.stringify(poolConfigs)
     });
 
     worker.on('exit', function(code, signal){
         logger.error('Master', 'Payment Processor', `Payment processor died (code ${code}, signal ${signal}), spawning replacement...`);
         setTimeout(function(){
-            startPaymentProcessor(poolConfigs);
+            startBlockUnlocker(poolConfigs);
         }, 2000);
     });
 };
@@ -316,7 +333,7 @@ const startPoolApi = function(){
     poolConfigs = buildPoolConfigs();
 
     spawnPoolWorkers();
-    startPaymentProcessor();
+    startBlockUnlocker();
     startWebsite();
     startPoolApi();
     startCliListener();

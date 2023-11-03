@@ -189,7 +189,6 @@ module.exports = function(log, poolConfig){
                         Date.now() / 1000 | 0,
                         shareData.blockDiff,
                         totalShares,
-                        shareData.blockReward
                     ].join(':')]
                 );
 

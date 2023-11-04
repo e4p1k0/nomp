@@ -209,7 +209,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             addressAccount = tx.result;
                             return;
                         }
-
                         const round = rounds[i];
 
                         if (tx.error && tx.error.code === -5) {
@@ -258,6 +257,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                                 return false;
                         }
                     });
+                    console.log('addressAccount', addressAccount)
 
                     callback(null, rounds, addressAccount);
 
@@ -448,7 +448,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 startRedisTimer();
                 redisClient.multi(finalRedisCommands).exec(function(error, results){
                     endRedisTimer();
-                    if (error){
+                    if (error) {
                         clearInterval(blockUnlockingInterval);
                         logger.error(logSystem, logComponent,
                                 'Payments sent but could not update redis. ' + JSON.stringify(error)

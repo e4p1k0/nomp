@@ -8,6 +8,7 @@ const PoolLogger = require('./libs/logUtil.js');
 const CliListener = require('./libs/cliListener.js');
 const PoolWorker = require('./libs/poolWorker.js');
 const BlockUnlocker = require('./libs/blockUnlocker.js');
+const PaymentProcessor = require('./libs/paymentProcessor.js');
 const Website = require('./libs/website.js');
 const PoolApi = require('./libs/poolApi.js');
 
@@ -66,6 +67,9 @@ if (cluster.isWorker){
             break;
         case 'blockUnlocker':
             new BlockUnlocker(logger);
+            break;
+        case 'paymentProcessor':
+            new PaymentProcessor(logger);
             break;
         case 'website':
             new Website(logger);
@@ -289,6 +293,33 @@ const startBlockUnlocker = function(){
     });
 
     worker.on('exit', function(code, signal){
+        logger.error('Master', 'Block Unlocker', `Block unlocker died (code ${code}, signal ${signal}), spawning replacement...`);
+        setTimeout(function(){
+            startBlockUnlocker(poolConfigs);
+        }, 2000);
+    });
+};
+
+const startPaymentProcessor = function(){
+    let enabledForAny = false;
+    for (const pool in poolConfigs){
+        const p = poolConfigs[pool];
+        const enabled = p.enabled && p.paymentProcessing && p.paymentProcessing.enabled;
+        if (enabled){
+            enabledForAny = true;
+            break;
+        }
+    }
+
+    if (!enabledForAny)
+        return;
+
+    const worker = cluster.fork({
+        workerType: 'paymentProcessor',
+        pools: JSON.stringify(poolConfigs)
+    });
+
+    worker.on('exit', function(code, signal){
         logger.error('Master', 'Payment Processor', `Payment processor died (code ${code}, signal ${signal}), spawning replacement...`);
         setTimeout(function(){
             startBlockUnlocker(poolConfigs);
@@ -334,6 +365,7 @@ const startPoolApi = function(){
 
     spawnPoolWorkers();
     startBlockUnlocker();
+    startPaymentProcessor();
     startWebsite();
     startPoolApi();
     startCliListener();

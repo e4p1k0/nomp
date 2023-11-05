@@ -96,7 +96,7 @@ module.exports = function(logger){
             })
         }
 
-        var pool = Stratum.createPool(poolOptions, authorizeFN, logger);
+        const pool = Stratum.createPool(poolOptions, authorizeFN, logger);
         pool.on('share', function(isValidShare, isValidBlock, data){
             const shareData = JSON.stringify(data)
             // job: '1',

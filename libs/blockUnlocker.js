@@ -51,7 +51,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
-        readTimeout: 5
     });
 
     let magnitude;
@@ -401,6 +400,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         case 'kicked':
                             console.log("kicked")
                             movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksKicked', `${r.serialized}:2`]);
+                            break;
                         case 'orphan':
                             console.log("orphan")
                             movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksOrphaned', `${r.serialized}:1`]);
@@ -428,7 +428,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 }
 
                 startRedisTimer();
-                redisClient.multi(finalRedisCommands).exec(function(error, results){
+                redisClient.multi(finalRedisCommands).exec(function(error, _){
                     endRedisTimer();
                     if (error) {
                         clearInterval(blockUnlockingInterval);
@@ -436,7 +436,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                                 'Payments sent but could not update redis. ' + JSON.stringify(error)
                                 + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
                                 + name + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(err){
+                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(_){
                             logger.error('Could not write finalRedisCommands.txt, you are fucked.');
                         });
                     }

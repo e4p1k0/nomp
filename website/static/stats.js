@@ -10,19 +10,18 @@ let statData
 let poolKeys
 
 function buildChartData(){
-
     const pools = {}
 
     poolKeys = [];
-    for (var i = 0; i < statData.length; i++){
-        for (var pool in statData[i].pools){
+    for (let i = 0; i < statData.length; i++){
+        for (pool in statData[i].pools){
             if (poolKeys.indexOf(pool) === -1)
                 poolKeys.push(pool);
         }
     }
 
 
-    for (var i = 0; i < statData.length; i++){
+    for (let i = 0; i < statData.length; i++){
 
         const time = statData[i].time * 1000
 
@@ -52,7 +51,7 @@ function buildChartData(){
     poolHashrateData = [];
     poolBlockData = [];
 
-    for (var pool in pools){
+    for (const pool in pools){
         poolWorkerData.push({
             key: pool,
             values: pools[pool].workers
@@ -173,21 +172,21 @@ statsSource.addEventListener('message', function(e){
         const time = stats.time * 1000
         for (let f = 0; f < poolKeys.length; f++) {
             const pool = poolKeys[f]
-            for (var i = 0; i < poolWorkerData.length; i++) {
+            for (let i = 0; i < poolWorkerData.length; i++) {
                 if (poolWorkerData[i].key === pool) {
                     poolWorkerData[i].values.shift();
                     poolWorkerData[i].values.push([time, pool in stats.pools ? stats.pools[pool].workerCount : 0]);
                     break;
                 }
             }
-            for (var i = 0; i < poolHashrateData.length; i++) {
+            for (let i = 0; i < poolHashrateData.length; i++) {
                 if (poolHashrateData[i].key === pool) {
                     poolHashrateData[i].values.shift();
                     poolHashrateData[i].values.push([time, pool in stats.pools ? stats.pools[pool].hashrate : 0]);
                     break;
                 }
             }
-            for (var i = 0; i < poolBlockData.length; i++) {
+            for (let i = 0; i < poolBlockData.length; i++) {
                 if (poolBlockData[i].key === pool) {
                     poolBlockData[i].values.shift();
                     poolBlockData[i].values.push([time, pool in stats.pools ? stats.pools[pool].blocks.pending : 0]);

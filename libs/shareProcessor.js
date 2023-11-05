@@ -38,7 +38,6 @@ module.exports = function(log, poolConfig){
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
-        readTimeout: 5
     })
 
     client.on('ready', function(){

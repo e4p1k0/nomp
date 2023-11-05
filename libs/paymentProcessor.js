@@ -54,7 +54,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
-        readTimeout: 5
     })
 
     let magnitude;

@@ -69,7 +69,6 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
-        readTimeout: 5
     });
 
     setInterval(function(){
@@ -82,11 +81,10 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
 
     function ProcessRPCApi() {
         const startApiProcess = Date.now();
-
+        let startTimeRedis;
+        let startTimeRPC;
         let timeSpentRPC = 0;
         let timeSpentRedis = 0;
-
-        const now = Date.now();
 
         const startRedisTimer = function(){ startTimeRedis = Date.now() };
         const endRedisTimer = function(){ timeSpentRedis += Date.now() - startTimeRedis };
@@ -187,7 +185,6 @@ function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
-        readTimeout: 5
     })
 
     setInterval(function(){
@@ -200,6 +197,7 @@ function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
 
     function ProcessApi() {
         const startApiProcess = Date.now();
+        let startTimeRedis;
 
         let timeSpentRedis = 0;
 

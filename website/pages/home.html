@@ -127,7 +127,7 @@
     $(function() {
         statsSource.addEventListener('message', function (e) {
             const stats = JSON.parse(e.data)
-            for (algo in stats.algos) {
+            for (const algo in stats.algos) {
                 $('#statsMiners' + algo).text(stats.algos[algo].workers);
                 $('#statsHashrate' + algo).text(stats.algos[algo].hashrateString);
             }

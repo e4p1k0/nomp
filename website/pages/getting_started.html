@@ -36,8 +36,7 @@
         display: block;
         color: #e3f7ff;
         text-decoration: none;
-        padding: 7px;
-        padding-left: 25px;
+        padding: 7px 7px 7px 25px;
         text-transform: capitalize;
     }
 
@@ -158,7 +157,7 @@
         font-weight: bold;
         padding-right: 30px;
     }
-    #coinInfoRowKeys .coinInfoSubtle{
+    #coinInfoRowKeys .coinInfoSubtle {
         font-weight: normal;
     }
     #coinInfoRowValues{
@@ -269,10 +268,10 @@
 
     function showCoinConfig(info){
 
-        var htmlKeys = '<div class="coinInfoData">Algorithm:</div>';
-        var htmlValues = '<div class="coinInfoData">' + info.algo + '</div>';
+        let htmlKeys = '<div class="coinInfoData">Algorithm:</div>'
+        let htmlValues = '<div class="coinInfoData">' + info.algo + '</div>'
 
-        for (var port in info.ports){
+        for (let port in info.ports){
             htmlKeys += '<div class="coinInfoData">URL <span class="coinInfoSubtle">(difficulty ' + info.ports[port].diff + ')</span>:</div>';
             htmlValues += '<div class="coinInfoData">stratum+tcp://' + info.host + ':' + port + '</div>';
         }

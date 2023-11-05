@@ -21,19 +21,19 @@ module.exports = function(logger, portalConfig, poolConfigs){
     setupStatsRedis();
     gatherStatHistory();
 
-    var canDoStats = true;
+    const canDoStats = true
 
     Object.keys(poolConfigs).forEach(function(coin){
 
         if (!canDoStats) return;
 
-        var poolConfig = poolConfigs[coin];
+        const poolConfig = poolConfigs[coin]
 
         const redisConfig = poolConfig.redis;
         const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
 
-        for (var i = 0; i < redisClients.length; i++){
-            var client = redisClients[i];
+        for (let i = 0; i < redisClients.length; i++){
+            const client = redisClients[i]
             if (client.client.port === redisConfig.port && client.client.host === redisConfig.host){
                 client.coins.push(coin);
                 return;

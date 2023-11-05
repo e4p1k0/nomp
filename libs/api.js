@@ -1,14 +1,14 @@
 const Redis = require('ioredis');
-var async = require('async');
+const async = require('async')
 
-var stats = require('./stats.js');
+const stats = require('./stats.js')
 
 module.exports = function(logger, portalConfig, poolConfigs){
 
 
-    var _this = this;
+    const _this = this
 
-    var portalStats = this.stats = new stats(logger, portalConfig, poolConfigs);
+    const portalStats = this.stats = new stats(logger, portalConfig, poolConfigs)
 
     this.liveStatConnections = {};
 
@@ -29,7 +29,7 @@ module.exports = function(logger, portalConfig, poolConfigs){
                     'Connection': 'keep-alive'
                 });
                 res.write('\n');
-                var uid = Math.random().toString();
+                const uid = Math.random().toString()
                 _this.liveStatConnections[uid] = res;
                 req.on("close", function() {
                     delete _this.liveStatConnections[uid];

@@ -4,7 +4,7 @@ const Stratum = require('stratum-pool');
 const ShareProcessor = require('./shareProcessor.js');
 
 module.exports = function(logger){
-    var _this = this;
+    const _this = this
 
     const poolConfigs  = JSON.parse(process.env.pools);
     // var portalConfig = JSON.parse(process.env.portalConfig);
@@ -18,7 +18,7 @@ module.exports = function(logger){
         switch(message.type){
 
             case 'banIP':
-                for (var p in pools){
+                for (let p in pools){
                     if (pools[p].stratumServer)
                         pools[p].stratumServer.addBannedIP(message.ip);
                 }
@@ -26,10 +26,10 @@ module.exports = function(logger){
 
             case 'blocknotify':
 
-                var messageCoin = message.coin.toLowerCase();
-                var poolTarget = Object.keys(pools).filter(function(p){
-                    return p.toLowerCase() === messageCoin;
-                })[0];
+                const messageCoin = message.coin.toLowerCase()
+                const poolTarget = Object.keys(pools).filter(function (p) {
+                    return p.toLowerCase() === messageCoin
+                })[0]
 
                 if (poolTarget)
                     pools[poolTarget].processBlockNotify(message.hash, 'blocknotify script');
@@ -40,17 +40,20 @@ module.exports = function(logger){
 
     Object.keys(poolConfigs).forEach(function(coin) {
         let poolOptions = poolConfigs[coin];
-        var logSystem = 'Pool';
-        var logComponent = coin;
-        var logSubCat = 'Thread ' + (parseInt(forkId) + 1);
+        const logSystem = 'Pool'
+        const logComponent = coin
+        const logSubCat = 'Thread ' + (parseInt(forkId) + 1)
 
-        var handlers = {
-            auth: function(){},
-            share: function(){},
-            diff: function(){}
-        };
+        const handlers = {
+            auth: function () {
+            },
+            share: function () {
+            },
+            diff: function () {
+            },
+        }
 
-        var shareProcessor = new ShareProcessor(logger, poolOptions);
+        const shareProcessor = new ShareProcessor(logger, poolOptions)
 
         handlers.auth = function(port, login, password, authCallback){
             if (poolOptions.validateWorkerUsername !== true)
@@ -66,9 +69,9 @@ module.exports = function(logger){
                     }
                 } else {
                     pool.daemon.cmd('validateaddress', [login], function (results) {
-                        var isValid = results.filter(function (r) {
+                        const isValid = results.filter(function (r) {
                             return r.response.isvalid
-                        }).length > 0;
+                        }).length > 0
                         authCallback(isValid);
                     });
                 }
@@ -80,22 +83,22 @@ module.exports = function(logger){
             shareProcessor.handleShare(isValidShare, isValidBlock, data);
         };
 
-        var authorizeFN = function (ip, port, login, password, callback) {
-            handlers.auth(port, login, password, function(authorized){
-                const authString = authorized ? 'Authorized' : 'Unauthorized ';
+        const authorizeFN = function (ip, port, login, password, callback) {
+            handlers.auth(port, login, password, function (authorized) {
+                const authString = authorized ? 'Authorized' : 'Unauthorized '
 
-                logger.debug(logSystem, logComponent, logSubCat, authString + ' ' + login + ':' + password + ' [' + ip + ']');
+                logger.debug(logSystem, logComponent, logSubCat, authString + ' ' + login + ':' + password + ' [' + ip + ']')
                 callback({
                     error: null,
                     authorized: authorized,
-                    disconnect: false
-                });
-            });
-        };
+                    disconnect: false,
+                })
+            })
+        }
 
         var pool = Stratum.createPool(poolOptions, authorizeFN, logger);
         pool.on('share', function(isValidShare, isValidBlock, data){
-            var shareData = JSON.stringify(data);
+            const shareData = JSON.stringify(data)
             // job: '1',
             // ip: '::ffff:81.177.74.130',
             // port: 3031,

@@ -1,17 +1,17 @@
-var poolWorkerData;
-var poolHashrateData;
-var poolBlockData;
+let poolWorkerData
+let poolHashrateData
+let poolBlockData
 
-var poolWorkerChart;
-var poolHashrateChart;
-var poolBlockChart;
+let poolWorkerChart
+let poolHashrateChart
+let poolBlockChart
 
-var statData;
-var poolKeys;
+let statData
+let poolKeys
 
 function buildChartData(){
 
-    var pools = {};
+    const pools = {}
 
     poolKeys = [];
     for (var i = 0; i < statData.length; i++){
@@ -24,15 +24,15 @@ function buildChartData(){
 
     for (var i = 0; i < statData.length; i++){
 
-        var time = statData[i].time * 1000;
+        const time = statData[i].time * 1000
 
-        for (var f = 0; f < poolKeys.length; f++){
-            var pName = poolKeys[f];
-            var a = pools[pName] = (pools[pName] || {
+        for (let f = 0; f < poolKeys.length; f++){
+            const pName = poolKeys[f]
+            const a = pools[pName] = (pools[pName] || {
                 hashrate: [],
                 workers: [],
-                blocks: []
-            });
+                blocks: [],
+            })
             if (pName in statData[i].pools){
                 a.hashrate.push([time, statData[i].pools[pName].hashrate]);
                 a.workers.push([time, statData[i].pools[pName].workerCount]);
@@ -69,8 +69,8 @@ function buildChartData(){
 }
 
 function getReadableHashRateString(hashrate){
-    var i = -1;
-    var byteUnits = [ ' KH', ' MH', ' GH', ' TH', ' PH' ];
+    let i = -1
+    const byteUnits = [' KH', ' MH', ' GH', ' TH', ' PH']
     do {
         hashrate = hashrate / 1024;
         i++;
@@ -79,7 +79,7 @@ function getReadableHashRateString(hashrate){
 }
 
 function timeOfDayFormat(timestamp){
-    var dStr = d3.time.format('%I:%M %p')(new Date(timestamp));
+    let dStr = d3.time.format('%I:%M %p')(new Date(timestamp))
     if (dStr.indexOf('0') === 0) dStr = dStr.slice(1);
     return dStr;
 }
@@ -153,26 +153,26 @@ $.getJSON('/api/pool_stats', function(data){
 });
 
 statsSource.addEventListener('message', function(e){
-    var stats = JSON.parse(e.data);
+    const stats = JSON.parse(e.data)
     statData.push(stats);
 
 
-    var newPoolAdded = (function(){
-        for (var p in stats.pools){
+    const newPoolAdded = (function () {
+        for (let p in stats.pools) {
             if (poolKeys.indexOf(p) === -1)
-                return true;
+                return true
         }
-        return false;
-    })();
+        return false
+    })()
 
     if (newPoolAdded || Object.keys(stats.pools).length > poolKeys.length){
         buildChartData();
         displayCharts();
     }
     else {
-        var time = stats.time * 1000;
-        for (var f = 0; f < poolKeys.length; f++) {
-            var pool =  poolKeys[f];
+        const time = stats.time * 1000
+        for (let f = 0; f < poolKeys.length; f++) {
+            const pool = poolKeys[f]
             for (var i = 0; i < poolWorkerData.length; i++) {
                 if (poolWorkerData[i].key === pool) {
                     poolWorkerData[i].values.shift();

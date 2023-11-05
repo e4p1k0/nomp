@@ -168,10 +168,6 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
 
     }
 
-    //  idk what error can occur here
-    if (false) {
-        setupFinished(false);
-    }
     setupFinished(true);
 }
 
@@ -305,8 +301,6 @@ function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
     }
 
     //  if error
-    if (false) {
-        setupFinished(false);
-    }
+
     setupFinished(true);
 }

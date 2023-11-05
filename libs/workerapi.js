@@ -1,23 +1,23 @@
-var express = require('express');
-var os = require('os');
+const express = require('express')
+const os = require('os')
 
 
 function workerapi(listen) {
-	var _this = this;
-	var app = express();
-	var counters = {
-		validShares   : 0,
-		validBlocks   : 0,
-		invalidShares : 0
-	};
+    const _this = this
+    const app = express()
+    const counters = {
+        validShares: 0,
+        validBlocks: 0,
+        invalidShares: 0,
+    }
 
-	var lastEvents = {
-		lastValidShare   : 0 ,
-		lastValidBlock   : 0,
-		lastInvalidShare : 0
-	};
+    const lastEvents = {
+        lastValidShare: 0,
+        lastValidBlock: 0,
+        lastInvalidShare: 0,
+    }
 
-	app.get('/stats', function (req, res) {
+    app.get('/stats', function (req, res) {
 		res.send({
 			"clients"    : Object.keys(_this.poolObj.stratumServer.getStratumClients()).length,
 			"counters"   : counters,
@@ -34,8 +34,8 @@ function workerapi(listen) {
 			});
 		})
 		.on('share', function(isValidShare, isValidBlock, shareData) {
-			var now = Date.now();
-			if (isValidShare) {
+            const now = Date.now()
+            if (isValidShare) {
 				counters.validShares ++;
 				lastEvents.lastValidShare = now;
 				if (isValidBlock) {

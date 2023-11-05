@@ -64,12 +64,8 @@ There is zero risk to the pool operator. Shares from rounds resulting in orphane
 current round so that each and every share will be rewarded
 
 * This portal does not have user accounts/logins/registrations. Instead, miners simply use their coin address for stratum
-authentication. A minimalistic HTML5 front-end connects to the portals statistics API to display stats from from each
+authentication. A minimalistic HTML5 front-end connects to the portals statistics API to display stats from each
 pool such as connected miners, network/pool difficulty/hash rate, etc.
-
-* Coin-switching ports using coin-networks and crypto-exchange APIs to detect profitability. Miner's connect to these ports
-with their public key which NOMP uses to derive an address for any coin needed to be paid out.
-
 
 #### Attack Mitigation
 * Detects and thwarts socket flooding (garbage data sent over socket in order to consume system resources).
@@ -270,69 +266,6 @@ Explanation for each field:
     "redis": {
         "host": "127.0.0.1",
         "port": 6379
-    },
-
-
-    /* With this switching configuration, you can setup ports that accept miners for work based on
-       a specific algorithm instead of a specific coin. Miners that connect to these ports are
-       automatically switched a coin determined by the server. The default coin is the first
-       configured pool for each algorithm and coin switching can be triggered using the
-       cli.js script in the scripts folder.
-
-       Miners connecting to these switching ports must use their public key in the format of
-       RIPEMD160(SHA256(public-key)). An address for each type of coin is derived from the miner's
-       public key, and payments are sent to that address. */
-    "switching": {
-        "switch1": {
-            "enabled": false,
-            "algorithm": "sha256",
-            "ports": {
-                "3333": {
-                    "diff": 10,
-                    "varDiff": {
-                        "minDiff": 16,
-                        "maxDiff": 512,
-                        "targetTime": 15,
-                        "retargetTime": 90,
-                        "variancePercent": 30
-                    }
-                }
-            }
-        },
-        "switch2": {
-            "enabled": false,
-            "algorithm": "scrypt",
-            "ports": {
-                "4444": {
-                    "diff": 10,
-                    "varDiff": {
-                        "minDiff": 16,
-                        "maxDiff": 512,
-                        "targetTime": 15,
-                        "retargetTime": 90,
-                        "variancePercent": 30
-                    }
-                }
-            }
-        },
-        "switch3": {
-            "enabled": false,
-            "algorithm": "x11",
-            "ports": {
-                "5555": {
-                    "diff": 0.001
-                }
-            }
-        }
-    },
-
-    "profitSwitch": {
-        "enabled": false,
-        "updateInterval": 600,
-        "depth": 0.90,
-        "usePoloniex": true,
-        "useCryptsy": true,
-        "useMintpal": true
     }
 }
 ````

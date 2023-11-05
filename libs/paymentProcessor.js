@@ -11,9 +11,9 @@ module.exports = function(logger){
 
     Object.keys(poolConfigs).forEach(function(coin) {
         const poolOptions = poolConfigs[coin];
-        if (poolOptions.paymentProcessing &&
-            poolOptions.paymentProcessing.enabled)
+        if (poolOptions.paymentProcessing?.enabled) {
             enabledPools.push(coin);
+        }
     });
 
     async.filter(enabledPools, function(coin, callback){
@@ -25,12 +25,14 @@ module.exports = function(logger){
 
         coins.forEach(function(coin){
             const poolOptions = poolConfigs[coin];
-            const processingConfig = poolOptions.paymentProcessing;
+
+            const cfg = poolOptions.paymentProcessing;
+            const daemonCfg = poolOptions.daemons[0];
+
             const logSystem = 'Payments';
-            logger.debug(logSystem, coin, 'Payment processing setup to run every '
-                + processingConfig.paymentInterval + ' second(s) with daemon ('
-                + processingConfig.daemon.user + '@' + processingConfig.daemon.host + ':' + processingConfig.daemon.port
-                + ') and redis (' + poolOptions.redis.host + ':' + poolOptions.redis.port + ')');
+            logger.debug(logSystem, coin, `Payment processing setup to run every ${cfg.interval}`
+                + ` with daemon (${daemonCfg.user}@${daemonCfg.host}:${daemonCfg.port})`
+                + ` and redis (${poolOptions.redis.host}:${poolOptions.redis.port})`);
 
         });
     });
@@ -38,11 +40,12 @@ module.exports = function(logger){
 
 function SetupForPool(logger, poolOptions, setupFinished){
     const coin = poolOptions.coin.name;
-    const pplns = poolOptions.pplns;
-    const processingConfig = poolOptions.paymentProcessing;
+
+    const cfg = poolOptions.paymentProcessing;
+    const daemonCfg = poolOptions.daemons[0];
     const logSystem = 'Payments';
     const logComponent = coin;
-    const daemon = new Stratum.daemon.interface([processingConfig.daemon], function(severity, message){
+    const daemon = new Stratum.daemon.interface([daemonCfg], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
     const redisConfig = poolOptions.redis;
@@ -57,10 +60,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
     let magnitude;
     let minPaymentSatoshis;
     let coinPrecision;
-    let paymentInterval;
-
-
-
+    let interval;
 
     async.parallel([
         function(callback){
@@ -97,7 +97,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 try {
                     const d = result.data.split('result":')[1].split(',')[0].split('.')[1];
                     magnitude = parseInt('10' + new Array(d.length).join('0'));
-                    minPaymentSatoshis = parseInt(processingConfig.minimumPayment * magnitude);
+                    minPaymentSatoshis = parseInt(cfg.minimumPayment * magnitude);
                     coinPrecision = magnitude.toString().length - 1;
                     callback();
                 }
@@ -114,13 +114,13 @@ function SetupForPool(logger, poolOptions, setupFinished){
             return;
         }
 
-        paymentInterval = setInterval(function(){
+        interval = setInterval(function(){
             try {
                 processPayments();
             } catch(e){
                 throw e;
             }
-        }, processingConfig.paymentInterval * 1000);
+        }, cfg.interval * 1000);
         setTimeout(processPayments, 100);
         setupFinished(true);
     });
@@ -179,7 +179,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     endRedisTimer();
 
                     if (error) {
-                        logger.error(logSystem, logComponent, 'Could not get candidates from redis ' + JSON.stringify(error));
+                        logger.error(logSystem, logComponent, 'Could not get miners from redis ' + JSON.stringify(error));
                         callback(true);
                         return;
                     }
@@ -215,8 +215,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         const worker = minersToPay[w];
                         worker.balance = worker.balance || 0;
                         const toSend = worker.balance * (1 - withholdPercent);
-                        console.log(toSend)
-                        console.log(satoshisToCoins(toSend))
                         if (toSend >= minPaymentSatoshis) {
                             totalSent += toSend;
                             const address = worker.address = (worker.address || getProperAddress(w));
@@ -228,24 +226,22 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         }
                     }
 
-
-                    console.log('poolOptions.address', poolOptions.address)
-                    console.log('addressAmounts', addressAmounts)
-                    console.log('totalSent', totalSent)
+                    // return
                     if (totalSent === 0) {
                         logger.debug(logSystem, logComponent, 'No miners to credit');
                         callback(true);
                         return;
                     }
-                    // daemon.cmd('sendmany', [poolOptions.address || '', addressAmounts], function (result) {
+                    startRPCTimer();
                     daemon.cmd('sendmany', ['', addressAmounts], function (result) {
+                        endRPCTimer();
                         //Check if payments failed because wallet doesn't have enough coins to pay for tx fees
                         if (result.error && result.error.code === -6) {
                             console.log(result)
                             const higherPercent = withholdPercent + 0.01;
                             logger.warning(logSystem, logComponent, 'Not enough funds to cover the tx fees for sending out payments, decreasing rewards by '
                                 + (higherPercent * 100) + '% and retrying');
-                            // trySend(higherPercent);
+                            trySend(higherPercent);
                         } else if (result.error) {
                             logger.error(logSystem, logComponent, 'Error trying to send payments with RPC sendmany '
                                 + JSON.stringify(result.error));
@@ -259,10 +255,9 @@ function SetupForPool(logger, poolOptions, setupFinished){
                                     + '% of reward from miners to cover transaction fees. '
                                     + 'Fund pool wallet with coins to prevent this from happening');
                             }
-                            callback(null, addressAmounts);
+                            callback(null, addressAmounts, result.response);
                         }
 
-                        //  ADD PAYMENT TO DB
                         // {
                         //     error: null,
                         //         response: '06495b809c37abcdbe724c5d7b8103fae641c3820bae3ea048fd828cb5dae1c2',
@@ -281,33 +276,31 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 trySend(0);
 
             },
-            function(addressAmounts, rounds, callback){
-                console.log('addressAmounts', addressAmounts)
-                console.log('kiska')
-
+            function(addressAmounts, txId, callback){
+                const now = Math.round(Date.now() / 1000);
                 let redisCommands = [];
                 for (const address of Object.keys(addressAmounts)) {
-                    redisCommands.push(['hincrby', `${coin}:miners:${address}`, 'balance', -1 * coinsToSatoshies(parseFloat(addressAmounts[address]))]);
+                    const amount = coinsToSatoshies(parseFloat(addressAmounts[address]));
+                    redisCommands.push(['hincrby', `${coin}:miners:${address}`, 'balance', -1 * amount]);
+                    redisCommands.push(['hincrby', `${coin}:miners:${address}`, 'paid', amount]);
+                    redisCommands.push(['zadd', `${coin}:payments:${address}`, now, [txId, amount].join(':')]);
                 }
-                console.log('redisCommands', redisCommands)
 
                 startRedisTimer();
                 redisClient.multi(redisCommands).exec(function(error, results){
                     endRedisTimer();
-                    console.log('final error', error)
-                    console.log('final results', results)
                     if (error) {
-                        clearInterval(paymentInterval);
+                        clearInterval(interval);
                         logger.error(logSystem, logComponent,
                             'Payments sent but could not update redis. ' + JSON.stringify(error)
                             + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
                             + coin + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(coin + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(err){
+                        fs.writeFile(coin + '_finalRedisCommands.txt', JSON.stringify(redisCommands), function(err){
                             logger.error('Could not write finalRedisCommands.txt, you are fucked.');
                         });
                     }
 
-                    callback(true);
+                    callback(null);
                 });
             }
 

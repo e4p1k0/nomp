@@ -85,7 +85,7 @@ module.exports = function(logger){
     };
 
     //If html file was changed, reload it
-    watch('website', function(filename){
+    watch('website', function(evt, filename){
         const basename = path.basename(filename);
         if (basename in pageFiles){
             console.log(filename);
@@ -147,7 +147,7 @@ module.exports = function(logger){
                         for (const pName in poolConfigs){
                             if (pName.toLowerCase() === c)
                                 return {
-                                    daemon: poolConfigs[pName].paymentProcessing.daemon,
+                                    daemon: poolConfigs[pName].daemons[0],
                                     address: poolConfigs[pName].address
                                 }
                         }

@@ -1,16 +1,6 @@
 const Redis = require('ioredis');
-const Stratum = require('stratum-pool');
 
-/*
-This module deals with handling shares when in internal payment processing mode. It connects to a redis
-database and inserts shares with the database structure of:
-
-key: coin_name + ':' + block_height
-value: a hash with..
-        key:
-
- */
-
+//  This module deals with handling shares. It connects to a redis and inserts shares
 module.exports = function(log, poolConfig){
     const coin = poolConfig.coin.name;
     const forkId = process.env.forkId;
@@ -42,12 +32,11 @@ module.exports = function(log, poolConfig){
     }
 
     const redisConfig = poolConfig.redis;
-    const redisDB = (redisConfig.db && redisConfig.db > 0) ? redisConfig.db : 0;
-    const baseName = redisConfig.baseName ? redisConfig.baseName : coin;
+    const baseName = redisConfig.baseName;
     const client = new Redis({
         port: redisConfig.port,
         host: redisConfig.host,
-        db: redisDB,
+        db: redisConfig.db,
         maxRetriesPerRequest: 1,
         readTimeout: 5
     })
@@ -92,8 +81,6 @@ module.exports = function(log, poolConfig){
         if (!isValidShare) {
             return;
         }
-
-        // console.log('I`m in nomp, shareProcessor, handleShare:', shareData)
         // shareData
         // {
         //     job: '5',
@@ -129,23 +116,20 @@ module.exports = function(log, poolConfig){
         const dateNow = Date.now();
         const dateNowMs = Math.round(dateNow / 1000);
         const hashrateData = [ isValidShare ? shareData.difficulty : -shareData.difficulty, shareData.login, shareData.worker, dateNow];
-        redisCommands.push(['zadd', coin + ':hashrate', dateNowMs, hashrateData.join(':')]);
-        redisCommands.push(['zadd', coin + ':hashrate:miners:' + shareData.login, dateNowMs, hashrateData.join(':')]);
+        redisCommands.push(['zadd', `${baseName}:hashrate`, dateNowMs, hashrateData.join(':')]);
+        redisCommands.push(['zadd', `${baseName}:hashrate:miners:` + shareData.login, dateNowMs, hashrateData.join(':')]);
         redisCommands.push(['hset', `${baseName}:miners:${shareData.login}`, 'lastShare', dateNowMs]);
 
         if (isValidBlock) {
-            // redisCommands.push(['sadd', coin + ':blocksPending', [shareData.blockHash, shareData.txHash, shareData.height].join(':')]);
-            // redisCommands.push(['hincrby', coin + ':stats', 'validBlocks', 1]);
             redisCommands.push(['hset', `${baseName}:stats`, `lastBlockFound`, dateNowMs]);
+            redisCommands.push(['hincrby', `${baseName}:miners:${shareData.login}`, 'blocksFound', 1]);
 
             if (rewardType === 'pplns') {
                 redisCommands.push(['lrange', `${baseName}:lastShares`, 0, pplns]);
                 redisCommands.push(['hget', `${baseName}:stats`, 'roundShares']);
             } else if (rewardType === 'solo') {
-                redisCommands.push(['hget', `${baseName}:workers:${shareData.login}`, 'soloShares']);
+                redisCommands.push(['hget', `${baseName}:miners:${shareData.login}`, 'soloShares']);
             }
-        // } else if (shareData.blockHash) {
-        //     redisCommands.push(['hincrby', coin + ':stats', 'invalidBlocks', 1]);
         }
 
         client.multi(redisCommands).exec(function (err, replies) {
@@ -156,13 +140,9 @@ module.exports = function(log, poolConfig){
 
             if (isValidBlock) {
                 let redisCommands2 = [];
-                // console.log('replies', replies)
                 const totalShares = replies[replies.length - 1][1];
-                // let totalScore = 0;
-                // let totalShares = 0;
                 if (rewardType === 'solo') {
-                    redisCommands2.push(['hdel', `${baseName}:workers:${shareData.login}`, 'soloShares']);
-                    redisCommands2.push(['hincrby', `${baseName}:workers:${shareData.login}`, 'soloBlocksFound', 1]);
+                    redisCommands2.push(['hdel', `${baseName}:miners:${shareData.login}`, 'soloShares']);
                 } else if (rewardType === 'pplns') {
                     const pplnsShares = replies[replies.length - 2][1];
                     let totalSharesArr = [];
@@ -193,7 +173,7 @@ module.exports = function(log, poolConfig){
                 );
                 redisCommands2.push(['hdel', `${baseName}:stats`, 'roundShares']);
 
-                client.multi(redisCommands2).exec(function (err, replies) {
+                client.multi(redisCommands2).exec(function (err, _) {
                     if (err) {
                         log.error(logSystem, logComponent, logSubCat, `Error(2) failed to insert share data into redis:\n${JSON.stringify(redisCommands)}\n${JSON.stringify(err)}`);
                         // return;

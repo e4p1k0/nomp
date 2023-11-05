@@ -25,7 +25,16 @@ const portalConfig = JSON.parse(JSON.minify(fs.readFileSync("config.json", {enco
 
 const defaultValues = {
     type:   'pplns',
-    pplns:  10000
+    pplns:  10000,
+    redis: {
+        db: 0,
+    },
+    poolApi: {
+        rpcInterval: 5,
+        graphInterval: 300,
+        hrWindow: 1800,
+        largeHrWindow: 10800
+    },
 };
 
 let poolConfigs;
@@ -167,14 +176,34 @@ const buildPoolConfigs = function(){
         //  set default values
         if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
             poolOptions.type = defaultValues.type; //  default
-            logger.debug(logSystem, logComponent, logSubCat, `Pool type is not set, using default: ${poolOptions.type}`);
+            logger.error('Master', coinProfile.name,  `Pool type is not set, using default: ${poolOptions.type}`);
         }
         if (poolOptions.type === 'pplns' && !poolOptions.pplns) {
             poolOptions.pplns = defaultValues.pplns;  //  default
+            logger.error('Master', coinProfile.name,  `Pplns is not set, using default: ${defaultValues.pplns}`);
+        }
+
+        if (!poolOptions.redis.baseName) {
+            poolOptions.redis.baseName = poolOptions.coin.name;
+            logger.error('Master', coinProfile.name,  `Redis baseName is not set, using default: ${poolOptions.coin.name}`);
+        }
+
+        if (!poolOptions.redis.db) {
+            poolOptions.redis.db = defaultValues.redis.db;
+            logger.error('Master', coinProfile.name,  `Redis db is not set, using default: ${defaultValues.redis.db}`);
+        }
+
+        if (poolOptions.poolApi?.enabled) {
+
+            for (const option of Object.keys(defaultValues.poolApi)) {
+                if (!poolOptions.poolApi[option]) {
+                    poolOptions.poolApi[option] = defaultValues.poolApi[option];
+                    logger.error('Master', coinProfile.name,  `PoolAPI ${option} not set, using default: ${defaultValues.poolApi[option]}`);
+                }
+            }
+
         }
         //  set default values end
-
-
     });
     return configs;
 };
@@ -246,7 +275,7 @@ const spawnPoolWorkers = function(){
 
 };
 
-var startCliListener = function(){
+const startCliListener = function(){
     let cliPort = portalConfig.cliPort;
 
     const listener = new CliListener(cliPort);
@@ -277,15 +306,14 @@ const startBlockUnlocker = function(){
     let enabledForAny = false;
     for (const pool in poolConfigs){
         const p = poolConfigs[pool];
-        const enabled = p.enabled && p.paymentProcessing && p.paymentProcessing.enabled;
-        if (enabled){
+        const enabled = p.enabled && p.blockUnlocker && p.blockUnlocker.enabled;
+        if (enabled) {
             enabledForAny = true;
             break;
         }
     }
 
-    if (!enabledForAny)
-        return;
+    if (!enabledForAny) return;
 
     const worker = cluster.fork({
         workerType: 'blockUnlocker',
@@ -304,15 +332,14 @@ const startPaymentProcessor = function(){
     let enabledForAny = false;
     for (const pool in poolConfigs){
         const p = poolConfigs[pool];
-        const enabled = p.enabled && p.paymentProcessing && p.paymentProcessing.enabled;
+        const enabled = p.enabled && p.paymentProcessing?.enabled;
         if (enabled){
             enabledForAny = true;
             break;
         }
     }
 
-    if (!enabledForAny)
-        return;
+    if (!enabledForAny) return;
 
     const worker = cluster.fork({
         workerType: 'paymentProcessor',
@@ -344,8 +371,17 @@ const startWebsite = function(){
 };
 
 const startPoolApi = function(){
-    //  check later
-    // if (!portalConfig.poolApi.enabled) return;
+    let enabledForAny = false;
+    for (const pool in poolConfigs){
+        const p = poolConfigs[pool];
+        const enabled = p.enabled && p.poolApi?.enabled;
+        if (enabled){
+            enabledForAny = true;
+            break;
+        }
+    }
+
+    if (!enabledForAny) return;
 
     const worker = cluster.fork({
         workerType: 'poolApi',

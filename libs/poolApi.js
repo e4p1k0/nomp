@@ -9,14 +9,7 @@ module.exports = function(logger){
 
     Object.keys(poolConfigs).forEach(function(coin) {
         const poolOptions = poolConfigs[coin];
-
-
-        enabledPools.push(coin);
-
-        //  check poolapi enabled LATER
-        // if (poolOptions.paymentProcessing &&
-        //     poolOptions.paymentProcessing.enabled)
-        //     enabledPools.push(coin);
+        if (poolOptions.poolApi?.enabled) enabledPools.push(coin);
     });
 
     async.filter(enabledPools, function(coin, callback){
@@ -30,18 +23,18 @@ module.exports = function(logger){
 
         coins.forEach(function(coin){
             const poolOptions = poolConfigs[coin];
-            const processingConfig = poolOptions.paymentProcessing;
+            const daemonCfg = poolOptions.daemons[0];
             const logSystem = 'API';
-            logger.debug(logSystem, coin, 'RPC API setup to run every '
-                + processingConfig.paymentInterval + ' second(s) with daemon ('
-                + processingConfig.daemon.user + '@' + processingConfig.daemon.host + ':' + processingConfig.daemon.port
-                + ') and redis (' + poolOptions.redis.host + ':' + poolOptions.redis.port + ')');
+
+            logger.debug(logSystem, coin, `RPC API setup to run every ${poolOptions.poolApi.rpcInterval} sec`
+                + ` with daemon (${daemonCfg.user}@${daemonCfg.host}:${daemonCfg.port})`
+                + ` and redis (${poolOptions.redis.host}:${poolOptions.redis.port})`);
 
         });
     });
 
     async.filter(enabledPools, function(coin, callback){
-        SetupForPool(logger, poolConfigs[coin], function(setupResults){
+        SetupChartsCollectingForPool(logger, poolConfigs[coin], function(setupResults){
             callback(setupResults);
         });
     }, function(coins, error){
@@ -51,45 +44,42 @@ module.exports = function(logger){
 
         coins.forEach(function(coin){
             const poolOptions = poolConfigs[coin];
-            const processingConfig = poolOptions.paymentProcessing;
             const logSystem = 'API';
-            logger.debug(logSystem, coin, 'Charts collecting setup to run every '
-                + processingConfig.paymentInterval + ' second(s) with daemon ('
-                + processingConfig.daemon.user + '@' + processingConfig.daemon.host + ':' + processingConfig.daemon.port
-                + ') and redis (' + poolOptions.redis.host + ':' + poolOptions.redis.port + ')');
 
+            logger.debug(logSystem, coin, `Charts collecting setup to run every ${poolOptions.poolApi.graphInterval} sec`
+                + ` with redis (${poolOptions.redis.host}:${poolOptions.redis.port})`);
         });
     });
 };
 
 function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
     const coin = poolOptions.coin.name;
-
-    const processingConfig = poolOptions.paymentProcessing;
+    const cfg = poolOptions.poolApi;
     const logSystem = 'API';
     const logComponent = coin;
 
-    const daemon = new Stratum.daemon.interface([processingConfig.daemon], function(severity, message){
+    const daemon = new Stratum.daemon.interface([poolOptions.daemons[0]], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
 
     const redisConfig = poolOptions.redis;
+    const baseName = redisConfig.baseName;
+
     const redisClient = new Redis({
         port: redisConfig.port,
         host: redisConfig.host,
         db: redisConfig.db,
         maxRetriesPerRequest: 1,
         readTimeout: 5
-    })
+    });
 
-    processingConfig.apiInterval = 5;   // Setup LATER
     setInterval(function(){
         try {
             ProcessRPCApi();
         } catch(e){
             throw e;
         }
-    }, processingConfig.apiInterval * 1000);
+    }, cfg.rpcInterval * 1000);
 
     function ProcessRPCApi() {
         const startApiProcess = Date.now();
@@ -98,10 +88,12 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
         let timeSpentRedis = 0;
 
         const now = Date.now();
-        const nowMs = Math.round(now / 1000);
 
         const startRedisTimer = function(){ startTimeRedis = Date.now() };
         const endRedisTimer = function(){ timeSpentRedis += Date.now() - startTimeRedis };
+
+        const startRPCTimer = function(){ startTimeRPC = Date.now(); };
+        const endRPCTimer = function(){ timeSpentRPC += Date.now() - startTimeRPC };
 
         let batchRpcCalls = [
             ['getmininginfo', []]
@@ -114,7 +106,9 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
 
         async.waterfall([
                 function(callback){
+                    startRPCTimer();
                     daemon.batchCmd(batchRpcCalls, function(error, results){
+                        endRPCTimer();
                         // [
                         //     {
                         //         result: {
@@ -151,8 +145,8 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
                 },
                 function(height, difficulty, callback){
                     let redisCommands = [
-                        ['hset', coin + ':stats', 'height', height],
-                        ['hset', coin + ':stats', 'difficulty', difficulty],
+                        ['hset', `${baseName}:stats`, 'height', height],
+                        ['hset', `${baseName}:stats`, 'difficulty', difficulty],
                     ];
 
                     startRedisTimer();
@@ -168,30 +162,31 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
                 }],
             function () {
                 const apiProcessTime = Date.now() - startApiProcess;
-                logger.debug(logSystem, logComponent, 'Finished RPC interval - time spent: '
-                    + apiProcessTime + 'ms total, ' + timeSpentRedis + 'ms redis, '
-                    + timeSpentRPC + 'ms daemon RPC');
+                logger.debug(logSystem, logComponent, `RPC data collected - ${apiProcessTime} ms total: `
+                    + `${timeSpentRedis} ms redis, ${timeSpentRPC} ms RPC daemon`);
             }
         )
 
     }
 
-    //  if error
+    //  idk what error can occur here
     if (false) {
         setupFinished(false);
     }
     setupFinished(true);
 }
 
-function SetupForPool(logger, poolOptions, setupFinished){
+function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
     const coin = poolOptions.coin.name;
-    const processingConfig = poolOptions.paymentProcessing;
+    const cfg = poolOptions.poolApi;
     const logSystem = 'API';
     const logComponent = coin;
 
     const algo = poolOptions.coin.algorithm;
     const shareMultiplier = Math.pow(2, 32) / algos[algo].multiplier;
     const redisConfig = poolOptions.redis;
+    const baseName = redisConfig.baseName;
+
     const redisClient = new Redis({
         port: redisConfig.port,
         host: redisConfig.host,
@@ -200,25 +195,23 @@ function SetupForPool(logger, poolOptions, setupFinished){
         readTimeout: 5
     })
 
-    processingConfig.apiInterval = 7;   // Setup LATER
     setInterval(function(){
         try {
             ProcessApi();
         } catch(e){
             throw e;
         }
-    }, processingConfig.apiInterval * 1000);
+    }, cfg.graphInterval * 1000);
 
     function ProcessApi() {
         const startApiProcess = Date.now();
 
-        let timeSpentRPC = 0;
         let timeSpentRedis = 0;
 
         const now = Date.now();
         const nowMs = Math.round(now / 1000);
-        const hrWindow = 1800;                          // Setup LATER
-        const largeHrWindow = 10800;                    // Setup LATER
+        const hrWindow = cfg.hrWindow;
+        const largeHrWindow = cfg.largeHrWindow;
 
         const startRedisTimer = function(){ startTimeRedis = Date.now() };
         const endRedisTimer = function(){ timeSpentRedis += Date.now() - startTimeRedis };
@@ -227,8 +220,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
             function(callback){
                 startRedisTimer();
                 redisClient.multi([
-                    ['zremrangebyscore', coin + ':hashrate', '-inf', `(${nowMs - largeHrWindow}`],
-                    ['zrangebyscore', coin + ':hashrate', 0, '+inf']
+                    ['zremrangebyscore', `${baseName}:hashrate`, '-inf', `(${nowMs - largeHrWindow}`],
+                    ['zrangebyscore', `${baseName}:hashrate`, 0, '+inf']
                 ]).exec(function(error, results){
                     if (error) {
                         callback('API loop ended - redis error with multi get hashrate data');
@@ -284,11 +277,11 @@ function SetupForPool(logger, poolOptions, setupFinished){
 
             function(totalHashrate, totalHashrateAvg, miners, callback){
                 let redisCommands = [
-                    ['zadd', coin + ':charts:pool', nowMs, [totalHashrate, totalHashrateAvg].join(':')]
+                    ['zadd', `${baseName}:charts:pool`, nowMs, [totalHashrate, totalHashrateAvg].join(':')]
                 ];
 
                 for (let miner in miners) {
-                    redisCommands.push(['zadd', coin + ':charts:miners:' + miner, nowMs,
+                    redisCommands.push(['zadd', `${baseName}:charts:miners:` + miner, nowMs,
                         [miners[miner].hashrate, miners[miner].hashrateAvg].join(':')]);
                 }
 
@@ -305,9 +298,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
             }],
             function () {
                 const apiProcessTime = Date.now() - startApiProcess;
-                logger.debug(logSystem, logComponent, 'Finished interval - time spent: '
-                    + apiProcessTime + 'ms total, ' + timeSpentRedis + 'ms redis, '
-                    + timeSpentRPC + 'ms daemon RPC');
+                logger.debug(logSystem, logComponent, `Charts data collected - ${apiProcessTime} ms total: `
+                    + `${timeSpentRedis} ms redis`);
             }
         )
 

@@ -120,16 +120,18 @@ const buildPoolConfigs = function(){
                 }
             }
 
-            if (poolConfigFiles[f].coin === poolConfigFiles[i].coin){
-                logger.error('Master', poolConfigFiles[f].fileName, 'Pool has same configured coin file coins/' + poolConfigFiles[f].coin + ' as ' + poolConfigFiles[i].fileName + ' pool');
-                process.exit(1);
-                return;
-            }
+            // if (poolConfigFiles[f].coin === poolConfigFiles[i].coin){
+            //     logger.error('Master', poolConfigFiles[f].fileName, 'Pool has same configured coin file coins/' + poolConfigFiles[f].coin + ' as ' + poolConfigFiles[i].fileName + ' pool');
+            //     process.exit(1);
+            //     return;
+            // }
 
         }
     }
 
     poolConfigFiles.forEach(function(poolOptions){
+        const name = poolOptions.name ? poolOptions.name : `${poolOptions.coin.name}-${poolOptions.type}`;
+
         poolOptions.coinFileName = poolOptions.coin;
         let coinFilePath = 'coins/' + poolOptions.coinFileName;
         if (!fs.existsSync(coinFilePath)){
@@ -141,7 +143,7 @@ const buildPoolConfigs = function(){
         poolOptions.coin = coinProfile;
         poolOptions.coin.name = poolOptions.coin.name.toLowerCase();
 
-        if (poolOptions.coin.name in configs){
+        if (name in configs){
 
             logger.error('Master', poolOptions.fileName, 'coins/' + poolOptions.coinFileName
                 + ' has same configured coin name ' + poolOptions.coin.name + ' as coins/'
@@ -166,7 +168,7 @@ const buildPoolConfigs = function(){
             }
         }
 
-        configs[poolOptions.coin.name] = poolOptions;
+        configs[name] = poolOptions;
 
         if (!(coinProfile.algorithm in algos)) {
             logger.error('Master', coinProfile.name, 'Cannot run a pool for unsupported algorithm "' + coinProfile.algorithm + '"');

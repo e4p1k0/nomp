@@ -363,7 +363,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     endRedisTimer();
                     if (error) {
                         callback('ERROR occured while trying to move blocks from candidates to matured!!!');
-                        return;
+
                     }
 
                 })

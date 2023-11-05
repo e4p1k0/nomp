@@ -9,28 +9,29 @@ module.exports = function(logger){
     const poolConfigs = JSON.parse(process.env.pools);
     let enabledPools = [];
 
-    Object.keys(poolConfigs).forEach(function(coin) {
-        const poolOptions = poolConfigs[coin];
+    Object.keys(poolConfigs).forEach(function(configName) {
+        const poolOptions = poolConfigs[configName];
+        if (!poolOptions.name) poolOptions.name = configName;
         if (poolOptions.paymentProcessing?.enabled) {
-            enabledPools.push(coin);
+            enabledPools.push(configName);
         }
     });
 
-    async.filter(enabledPools, function(coin, callback){
-        SetupForPool(logger, poolConfigs[coin], function(setupResults){
+    async.filter(enabledPools, function(configName, callback){
+        SetupForPool(logger, poolConfigs[configName], function(setupResults){
             callback(setupResults);
         });
     }, function(coins, error){
         if (error) console.log('error', error)
 
-        coins.forEach(function(coin){
-            const poolOptions = poolConfigs[coin];
+        coins.forEach(function(configName){
+            const poolOptions = poolConfigs[configName];
 
             const cfg = poolOptions.paymentProcessing;
             const daemonCfg = poolOptions.daemons[0];
 
             const logSystem = 'Payments';
-            logger.debug(logSystem, coin, `Payment processing setup to run every ${cfg.interval}`
+            logger.debug(logSystem, configName, `Payment processing setup to run every ${cfg.interval}`
                 + ` with daemon (${daemonCfg.user}@${daemonCfg.host}:${daemonCfg.port})`
                 + ` and redis (${poolOptions.redis.host}:${poolOptions.redis.port})`);
 
@@ -39,16 +40,16 @@ module.exports = function(logger){
 };
 
 function SetupForPool(logger, poolOptions, setupFinished){
-    const coin = poolOptions.coin.name;
-
+    const name = poolOptions.name;
     const cfg = poolOptions.paymentProcessing;
     const daemonCfg = poolOptions.daemons[0];
     const logSystem = 'Payments';
-    const logComponent = coin;
+    const logComponent = name;
     const daemon = new Stratum.daemon.interface([daemonCfg], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
     const redisConfig = poolOptions.redis;
+    const baseName = poolOptions.redis.baseName;
     const redisClient = new Redis({
         port: redisConfig.port,
         host: redisConfig.host,
@@ -156,9 +157,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
             function(callback){
 
                 startRedisTimer();
-                redisClient.multi([
-                    ['keys', coin + ':miners:*']
-                ]).exec(function(error, results){
+                redisClient.multi([ ['keys', `${baseName}:miners:*`] ]).exec(function(error, results){
                     endRedisTimer();
 
                     if (error || !results[0] || !results[0][1]) {
@@ -189,7 +188,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         const balance = parseFloat(results[i][1]);
                         if (!balance || balance < minPaymentSatoshis) continue;
 
-                        const address = keys[i].replace(`${coin}:miners:`, '');
+                        const address = keys[i].replace(`${baseName}:miners:`, '');
                         if (!address) continue;
 
                         minersToPay.push({
@@ -281,9 +280,9 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 let redisCommands = [];
                 for (const address of Object.keys(addressAmounts)) {
                     const amount = coinsToSatoshies(parseFloat(addressAmounts[address]));
-                    redisCommands.push(['hincrby', `${coin}:miners:${address}`, 'balance', -1 * amount]);
-                    redisCommands.push(['hincrby', `${coin}:miners:${address}`, 'paid', amount]);
-                    redisCommands.push(['zadd', `${coin}:payments:${address}`, now, [txId, amount].join(':')]);
+                    redisCommands.push(['hincrby', `${baseName}:miners:${address}`, 'balance', -1 * amount]);
+                    redisCommands.push(['hincrby', `${baseName}:miners:${address}`, 'paid', amount]);
+                    redisCommands.push(['zadd', `${baseName}:payments:${address}`, now, [txId, amount].join(':')]);
                 }
 
                 startRedisTimer();
@@ -294,8 +293,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         logger.error(logSystem, logComponent,
                             'Payments sent but could not update redis. ' + JSON.stringify(error)
                             + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
-                            + coin + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(coin + '_finalRedisCommands.txt', JSON.stringify(redisCommands), function(err){
+                            + name + '_finalRedisCommands.txt must be ran manually');
+                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(redisCommands), function(err){
                             logger.error('Could not write finalRedisCommands.txt, you are fucked.');
                         });
                     }

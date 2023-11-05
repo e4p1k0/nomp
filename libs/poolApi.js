@@ -7,9 +7,10 @@ module.exports = function(logger){
     const poolConfigs = JSON.parse(process.env.pools);
     let enabledPools = [];
 
-    Object.keys(poolConfigs).forEach(function(coin) {
-        const poolOptions = poolConfigs[coin];
-        if (poolOptions.poolApi?.enabled) enabledPools.push(coin);
+    Object.keys(poolConfigs).forEach(function(configName) {
+        const poolOptions = poolConfigs[configName];
+        if (!poolOptions.name) poolOptions.name = configName;
+        if (poolOptions.poolApi?.enabled) enabledPools.push(configName);
     });
 
     async.filter(enabledPools, function(coin, callback){
@@ -53,10 +54,9 @@ module.exports = function(logger){
 };
 
 function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
-    const coin = poolOptions.coin.name;
     const cfg = poolOptions.poolApi;
     const logSystem = 'API';
-    const logComponent = coin;
+    const logComponent = poolOptions.name;
 
     const daemon = new Stratum.daemon.interface([poolOptions.daemons[0]], function(severity, message){
         logger[severity](logSystem, logComponent, message);
@@ -177,10 +177,10 @@ function SetupRPCAPIForPool(logger, poolOptions, setupFinished){
 }
 
 function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
-    const coin = poolOptions.coin.name;
     const cfg = poolOptions.poolApi;
     const logSystem = 'API';
-    const logComponent = coin;
+
+    const logComponent = poolOptions.name;
 
     const algo = poolOptions.coin.algorithm;
     const shareMultiplier = Math.pow(2, 32) / algos[algo].multiplier;

@@ -144,7 +144,6 @@ const buildPoolConfigs = function(){
         poolOptions.coin.name = poolOptions.coin.name.toLowerCase();
 
         if (name in configs){
-
             logger.error('Master', poolOptions.fileName, 'coins/' + poolOptions.coinFileName
                 + ' has same configured coin name ' + poolOptions.coin.name + ' as coins/'
                 + configs[poolOptions.coin.name].coinFileName + ' used by pool config '

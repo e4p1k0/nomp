@@ -7,24 +7,25 @@ module.exports = function(logger){
     const poolConfigs = JSON.parse(process.env.pools);
     let enabledPools = [];
 
-    Object.keys(poolConfigs).forEach(function(coin) {
-        const poolOptions = poolConfigs[coin];
-        if (poolOptions.blockUnlocker?.enabled) enabledPools.push(coin);
+    Object.keys(poolConfigs).forEach(function(configName) {
+        const poolOptions = poolConfigs[configName];
+        if (!poolOptions.name) poolOptions.name = configName;
+        if (poolOptions.blockUnlocker?.enabled) enabledPools.push(configName);
     });
 
-    async.filter(enabledPools, function(coin, callback){
-        SetupForPool(logger, poolConfigs[coin], function(setupResults){
+    async.filter(enabledPools, function(configName, callback){
+        SetupForPool(logger, poolConfigs[configName], function(setupResults){
             callback(setupResults);
         });
     }, function(coins, error){
         if (error) console.log('error', error)
 
-        coins.forEach(function(coin){
-            const poolOptions = poolConfigs[coin];
+        coins.forEach(function(configName){
+            const poolOptions = poolConfigs[configName];
             const cfg = poolOptions.blockUnlocker;
             const daemonCfg = poolOptions.daemons[0];
             const logSystem = 'Unlocker';
-            logger.debug(logSystem, coin, `Block unlocker setup to run every ${cfg.interval} sec`
+            logger.debug(logSystem, configName, `Block unlocker setup to run every ${cfg.interval} sec`
                 + ` with daemon (${daemonCfg.user}@${daemonCfg.host}:${daemonCfg.port})`
                 + ` and redis (${poolOptions.redis.host}:${poolOptions.redis.port})`);
 
@@ -33,13 +34,13 @@ module.exports = function(logger){
 };
 
 function SetupForPool(logger, poolOptions, setupFinished){
-    const coin = poolOptions.coin.name;
+    const name = poolOptions.name;
     const pplns = poolOptions.pplns;
 
     const cfg = poolOptions.blockUnlocker;
     const daemonCfg = poolOptions.daemons[0];
     const logSystem = 'Unlocker';
-    const logComponent = coin;
+    const logComponent = name;
     const daemon = new Stratum.daemon.interface([daemonCfg], function(severity, message){
         logger[severity](logSystem, logComponent, message);
     });
@@ -382,7 +383,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     if (worker.balanceChange !== 0){
                         balanceUpdateCommands.push([
                             'hincrbyfloat',
-                            coin + ':balances',
+                            `${baseName}:balances`,
                             w,
                             satoshisToCoins(worker.balanceChange)
                         ]);
@@ -400,10 +401,10 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     switch(r.category){
                         case 'kicked':
                             console.log("kicked")
-                            movePendingCommands.push(['smove', coin + `:blocksPending`, coin + ':blocksKicked', `${r.serialized}:2`]);
+                            movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksKicked', `${r.serialized}:2`]);
                         case 'orphan':
                             console.log("orphan")
-                            movePendingCommands.push(['smove', coin + `:blocksPending`, coin + ':blocksOrphaned', `${r.serialized}:1`]);
+                            movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksOrphaned', `${r.serialized}:1`]);
                             return;
                     }
                 });
@@ -435,8 +436,8 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         logger.error(logSystem, logComponent,
                                 'Payments sent but could not update redis. ' + JSON.stringify(error)
                                 + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
-                                + coin + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(coin + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(err){
+                                + name + '_finalRedisCommands.txt must be ran manually');
+                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(err){
                             logger.error('Could not write finalRedisCommands.txt, you are fucked.');
                         });
                     }

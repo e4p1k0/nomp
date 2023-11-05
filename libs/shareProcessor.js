@@ -2,10 +2,10 @@ const Redis = require('ioredis');
 
 //  This module deals with handling shares. It connects to a redis and inserts shares
 module.exports = function(log, poolConfig){
-    const coin = poolConfig.coin.name;
+    const name = poolConfig.name;
     const forkId = process.env.forkId;
     const logSystem = 'Pool';
-    const logComponent = coin;
+    const logComponent = name;
     const logSubCat = 'Thread ' + (parseInt(forkId) + 1);
 
     const rewardType = poolConfig.type;

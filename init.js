@@ -130,8 +130,6 @@ const buildPoolConfigs = function(){
     }
 
     poolConfigFiles.forEach(function(poolOptions){
-        const name = poolOptions.name ? poolOptions.name : `${poolOptions.coin.name}-${poolOptions.type}`;
-
         poolOptions.coinFileName = poolOptions.coin;
         let coinFilePath = 'coins/' + poolOptions.coinFileName;
         if (!fs.existsSync(coinFilePath)){
@@ -143,7 +141,11 @@ const buildPoolConfigs = function(){
         poolOptions.coin = coinProfile;
         poolOptions.coin.name = poolOptions.coin.name.toLowerCase();
 
-        if (name in configs){
+        if (! poolOptions.name) {
+            poolOptions.name = `${poolOptions.coin.name}-${poolOptions.type}`
+        }
+
+        if (poolOptions.name in configs){
             logger.error('Master', poolOptions.fileName, 'coins/' + poolOptions.coinFileName
                 + ' has same configured coin name ' + poolOptions.coin.name + ' as coins/'
                 + configs[poolOptions.coin.name].coinFileName + ' used by pool config '
@@ -167,7 +169,7 @@ const buildPoolConfigs = function(){
             }
         }
 
-        configs[name] = poolOptions;
+        configs[poolOptions.name] = poolOptions;
 
         if (!(coinProfile.algorithm in algos)) {
             logger.error('Master', coinProfile.name, 'Cannot run a pool for unsupported algorithm "' + coinProfile.algorithm + '"');
@@ -177,29 +179,28 @@ const buildPoolConfigs = function(){
         //  set default values
         if (!poolOptions.type || !['pplns', 'solo'].includes(poolOptions.type)) {
             poolOptions.type = defaultValues.type; //  default
-            logger.error('Master', coinProfile.name,  `Pool type is not set, using default: ${poolOptions.type}`);
+            logger.error('Master', poolOptions.name,  `Pool type is not set, using default: ${poolOptions.type}`);
         }
         if (poolOptions.type === 'pplns' && !poolOptions.pplns) {
             poolOptions.pplns = defaultValues.pplns;  //  default
-            logger.error('Master', coinProfile.name,  `Pplns is not set, using default: ${defaultValues.pplns}`);
+            logger.error('Master', poolOptions.name,  `Pplns is not set, using default: ${defaultValues.pplns}`);
         }
 
         if (!poolOptions.redis.baseName) {
             poolOptions.redis.baseName = poolOptions.coin.name;
-            logger.error('Master', coinProfile.name,  `Redis baseName is not set, using default: ${poolOptions.coin.name}`);
+            logger.error('Master', poolOptions.name,  `Redis baseName is not set, using default: ${poolOptions.coin.name}`);
         }
 
         if (!poolOptions.redis.db) {
             poolOptions.redis.db = defaultValues.redis.db;
-            logger.error('Master', coinProfile.name,  `Redis db is not set, using default: ${defaultValues.redis.db}`);
+            logger.error('Master', poolOptions.name,  `Redis db is not set, using default: ${defaultValues.redis.db}`);
         }
 
         if (poolOptions.poolApi?.enabled) {
-
             for (const option of Object.keys(defaultValues.poolApi)) {
                 if (!poolOptions.poolApi[option]) {
                     poolOptions.poolApi[option] = defaultValues.poolApi[option];
-                    logger.error('Master', coinProfile.name,  `PoolAPI ${option} not set, using default: ${defaultValues.poolApi[option]}`);
+                    logger.error('Master', poolOptions.name,  `PoolAPI ${option} not set, using default: ${defaultValues.poolApi[option]}`);
                 }
             }
 
@@ -255,7 +256,7 @@ const spawnPoolWorkers = function(){
             switch(msg.type){
                 case 'banIP':
                     Object.keys(cluster.workers).forEach(function(id) {
-                        if (cluster.workers[id].type === 'pool'){
+                        if (cluster.workers[id].type === 'pool') {
                             cluster.workers[id].send({type: 'banIP', ip: msg.ip});
                         }
                     });

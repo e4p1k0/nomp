@@ -9,7 +9,6 @@ module.exports = function(logger){
 
     Object.keys(poolConfigs).forEach(function(configName) {
         const poolOptions = poolConfigs[configName];
-        if (!poolOptions.name) poolOptions.name = configName;
         if (poolOptions.blockUnlocker?.enabled) enabledPools.push(configName);
     });
 

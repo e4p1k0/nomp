@@ -11,7 +11,6 @@ module.exports = function(logger){
 
     Object.keys(poolConfigs).forEach(function(configName) {
         const poolOptions = poolConfigs[configName];
-        if (!poolOptions.name) poolOptions.name = configName;
         if (poolOptions.paymentProcessing?.enabled) {
             enabledPools.push(configName);
         }
@@ -236,7 +235,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         endRPCTimer();
                         //Check if payments failed because wallet doesn't have enough coins to pay for tx fees
                         if (result.error && result.error.code === -6) {
-                            console.log(result)
+                            // error: { code: -6, message: 'Account has insufficient funds' },
                             const higherPercent = withholdPercent + 0.01;
                             logger.warning(logSystem, logComponent, 'Not enough funds to cover the tx fees for sending out payments, decreasing rewards by '
                                 + (higherPercent * 100) + '% and retrying');

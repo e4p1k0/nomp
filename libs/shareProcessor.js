@@ -109,7 +109,7 @@ module.exports = function(log, poolConfig){
             }
             redisCommands.push(['ltrim', `${baseName}:lastShares`, 0, pplns - 1]);
         } else {
-            redisCommands.push(['hincrbyfloat', `${baseName}:workers:${shareData.login}`, 'soloShares', shareData.difficulty]);
+            redisCommands.push(['hincrbyfloat', `${baseName}:miners:${shareData.login}`, 'soloShares', shareData.difficulty]);
         }
 
         const dateNow = Date.now();

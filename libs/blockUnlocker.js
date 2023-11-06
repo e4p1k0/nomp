@@ -1,4 +1,3 @@
-const fs = require('fs');
 const async = require('async');
 const Redis = require('ioredis');
 const Stratum = require('stratum-pool');
@@ -120,10 +119,6 @@ function SetupForPool(logger, poolOptions, setupFinished){
         setupFinished(true);
     });
 
-    const satoshisToCoins = function(satoshis){
-        return parseFloat((satoshis / magnitude).toFixed(coinPrecision));
-    };
-
     /* Deal with numbers in the smallest possible units (satoshis) as much as possible. This greatly helps with accuracy
        when rounding and whatnot. When we are storing numbers for only humans to see, store in whole coin units. */
     const processBlockUnlocking = function(){
@@ -231,26 +226,23 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         }
                     });
 
-                    //  Filter out all rounds that are immature (not confirmed or orphaned yet)
-                    rounds = rounds.filter(function(r){
-                        switch (r.category) {
-                            case 'orphan':
-                            case 'kicked':
-                            case 'generate':
-                                return true;
-                            default:
-                                return false;
+                    let goodRounds = [];
+                    let badRounds = [];
+
+                    for (const round of rounds) {
+                        if (round.category === 'generate') {
+                            goodRounds.push(round);
+                        } else {
+                            badRounds.push(round);
                         }
-                    });
-
-                    callback(null, rounds);
-
+                    }
+                    callback(null, goodRounds, badRounds);
                 });
             },
 
             /* Does a batch redis call to get shares contributed to each round. Then calculates the reward
                amount owned to each miner for each round. */
-            function(rounds, callback){
+            function(rounds, badRounds, callback){
                 const redisCommands = rounds.map(function(r){
                     if (r.type === 'pplns') return ['hgetall', `${baseName}:shares:pplnsRound` + r.height];
 
@@ -274,50 +266,42 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             return;
                         }
 
-                        switch (round.category) {
-                            case 'kicked':
-                            case 'orphan':
-                            case 'generate':
-                                /* We found a confirmed block! Now get the reward for it and calculate how much
-                                   we owe each miner based on the shares they submitted during that block round. */
 
-                                if (allWorkerShares[i][0]) {
-                                    logger.error(logSystem, logComponent, 'No worker shares for round: '
-                                        + round.height + ' blockHash: ' + round.blockHash);
-                                    return;
-                                }
-                                const roundShares = allWorkerShares[i][1];
-
-                                const recipients = [];
-                                if (round.type === 'solo') {
-                                    recipients.push({
-                                        login: round.finder,
-                                        share: 1,
-                                        reward: round.reward
-                                    })
-                                } else if (round.type === 'pplns') {
-                                    for (let login in roundShares) {
-                                        const share = roundShares[login] / pplns;
-                                        const reward = Math.floor(round.reward * share);
-                                        recipients.push({
-                                            login, share, reward
-                                        })
-                                    }
-                                } else {
-                                    logger.error(logSystem, logComponent, 'Unknown round type: '
-                                        + round.type + ' blockHash: ' + round.blockHash);
-                                    return;
-                                }
-                                round.recipients = recipients;
-                                break;
+                        if (allWorkerShares[i][0]) {
+                            logger.error(logSystem, logComponent, 'No worker shares for round: '
+                                + round.height + ' blockHash: ' + round.blockHash);
+                            return;
                         }
+                        const roundShares = allWorkerShares[i][1];
+
+                        const recipients = [];
+                        if (round.type === 'solo') {
+                            recipients.push({
+                                login: round.finder,
+                                share: 1,
+                                reward: round.reward
+                            })
+                        } else if (round.type === 'pplns') {
+                            for (let login in roundShares) {
+                                const share = roundShares[login] / pplns;
+                                const reward = Math.floor(round.reward * share);
+                                recipients.push({
+                                    login, share, reward
+                                })
+                            }
+                        } else {
+                            logger.error(logSystem, logComponent, `Unknown round type: ${round.type}`
+                                 + ` blockHash: ${round.blockHash}`);
+                            return;
+                        }
+                        round.recipients = recipients;
                     });
 
-                    callback(null, rounds);
+                    callback(null, rounds, badRounds);
                 });
             },
             /* create rewards and charge rewards to miner balances */
-            function(rounds, callback) {
+            function(rounds, badRounds, callback) {
                 const now = Math.round(Date.now() / 1000)
                 let redisCommands = [];
                 for (const round of rounds) {
@@ -336,25 +320,34 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 startRedisTimer();
                 redisClient.multi(redisCommands).exec(function(error, _) {
                     endRedisTimer();
-
                     if (error) {
                         callback('ERROR occured while trying to update balances and rewards!!!');
                         return;
                     }
 
-                    callback(null, rounds)
+                    callback(null, rounds, badRounds)
                 })
             },
 
             /* move candidates to matured */
-            function(rounds, callback) {
-                const goodBlock = 0;
-                // const badBlock = 1; //  orphan/uncle
+            function(rounds, badRounds, callback) {
                 let redisCommands = [];
 
-                for (const round of rounds) {
+                for (const round of [...rounds, ...badRounds]) {
+                    let uncleKey;
+                    if (round.category === 'generate') {
+                        uncleKey = 0;
+                    } else if (round.category === 'orphan') {
+                        uncleKey = 1;
+                    } else {
+                        uncleKey = 2;
+                    }
+
+                    if (!round.reward) {    //  in non-generate rounds
+                        round.reward = 0;
+                    }
                     redisCommands.push(['zrem', `${baseName}:blocks:candidates`, round.serialized]);
-                    redisCommands.push(['zadd', `${baseName}:blocks:matured`, round.height, `${round.serialized}:${round.reward}:${goodBlock}`]);
+                    redisCommands.push(['zadd', `${baseName}:blocks:matured`, round.height, `${round.serialized}:${round.reward}:${uncleKey}`]);
                 }
 
                 startRedisTimer();
@@ -362,88 +355,10 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     endRedisTimer();
                     if (error) {
                         callback('ERROR occured while trying to move blocks from candidates to matured!!!');
-
                     }
-
                 })
-                return;
                 callback(null)
-            },
-
-
-            function(workers, rounds, callback){
-                let totalPaid = 0;
-                let balanceUpdateCommands = [];
-                let workerPayoutsCommand = [];
-
-                for (const w in workers) {
-                    const worker = workers[w];
-                    if (worker.balanceChange !== 0){
-                        balanceUpdateCommands.push([
-                            'hincrbyfloat',
-                            `${baseName}:balances`,
-                            w,
-                            satoshisToCoins(worker.balanceChange)
-                        ]);
-                    }
-                    if (worker.sent !== 0){
-                        workerPayoutsCommand.push(['hincrbyfloat', `${baseName}:payouts`, w, worker.sent]);
-                        totalPaid += worker.sent;
-                    }
-                }
-
-                let movePendingCommands = [];
-                let orphanMergeCommands = [];
-
-                rounds.forEach(function(r){
-                    switch(r.category){
-                        case 'kicked':
-                            console.log("kicked")
-                            movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksKicked', `${r.serialized}:2`]);
-                            break;
-                        case 'orphan':
-                            console.log("orphan")
-                            movePendingCommands.push(['smove', baseName + `:blocksPending`, baseName + ':blocksOrphaned', `${r.serialized}:1`]);
-                            return;
-                    }
-                });
-
-                let finalRedisCommands = [];
-
-                if (movePendingCommands.length > 0)
-                    finalRedisCommands = finalRedisCommands.concat(movePendingCommands);
-
-                if (orphanMergeCommands.length > 0)
-                    finalRedisCommands = finalRedisCommands.concat(orphanMergeCommands);
-
-                if (balanceUpdateCommands.length > 0)
-                    finalRedisCommands = finalRedisCommands.concat(balanceUpdateCommands);
-
-                if (workerPayoutsCommand.length > 0)
-                    finalRedisCommands = finalRedisCommands.concat(workerPayoutsCommand);
-
-                if (finalRedisCommands.length === 0) {
-                    callback();
-                    return;
-                }
-
-                startRedisTimer();
-                redisClient.multi(finalRedisCommands).exec(function(error, _){
-                    endRedisTimer();
-                    if (error) {
-                        clearInterval(blockUnlockingInterval);
-                        logger.error(logSystem, logComponent,
-                                'Payments sent but could not update redis. ' + JSON.stringify(error)
-                                + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
-                                + name + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(finalRedisCommands), function(_){
-                            logger.error('Could not write finalRedisCommands.txt, you are fucked.');
-                        });
-                    }
-                    callback();
-                });
             }
-
         ], function(){
             const paymentProcessTime = Date.now() - processStarted;
             logger.debug(logSystem, logComponent, `Finished interval - ${paymentProcessTime} ms total: `

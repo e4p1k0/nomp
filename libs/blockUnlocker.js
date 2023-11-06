@@ -220,6 +220,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                         }
 
                         round.category = generationTx.category;
+
                         if (round.category === 'generate') {
                             const reward = generationTx.amount || generationTx.value;
                             round.reward = reward * magnitude;
@@ -232,7 +233,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                     for (const round of rounds) {
                         if (round.category === 'generate') {
                             goodRounds.push(round);
-                        } else {
+                        } else if (round.category !== 'immature') {
                             badRounds.push(round);
                         }
                     }

@@ -278,13 +278,13 @@ function SetupForPool(logger, poolOptions, setupFinished){
                 let redisCommands = [];
                 for (const address of Object.keys(addressAmounts)) {
                     const amount = coinsToSatoshies(parseFloat(addressAmounts[address]));
-                    redisCommands.push(['hincrby', `${baseName}:miners:${address}`, 'balance', -1 * amount]);
-                    redisCommands.push(['hincrby', `${baseName}:miners:${address}`, 'paid', amount]);
+                    redisCommands.push(['hincrbyfloat', `${baseName}:miners:${address}`, 'balance', -1 * amount]);
+                    redisCommands.push(['hincrbyfloat', `${baseName}:miners:${address}`, 'paid', amount]);
                     redisCommands.push(['zadd', `${baseName}:payments:${address}`, now, [txId, amount].join(':')]);
                 }
 
                 startRedisTimer();
-                redisClient.multi(redisCommands).exec(function(error, results){
+                redisClient.multi(redisCommands).exec(function(error, _){
                     endRedisTimer();
                     if (error) {
                         clearInterval(interval);
@@ -292,7 +292,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             'Payments sent but could not update redis. ' + JSON.stringify(error)
                             + ' Disabling payment processing to prevent possible double-payouts. The redis commands in '
                             + name + '_finalRedisCommands.txt must be ran manually');
-                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(redisCommands), function(err){
+                        fs.writeFile(name + '_finalRedisCommands.txt', JSON.stringify(redisCommands), function(_){
                             logger.error('Could not write finalRedisCommands.txt, you are fucked.');
                         });
                     }

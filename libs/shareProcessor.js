@@ -16,7 +16,7 @@ module.exports = function(log, poolConfig){
     let varDiffCfgFound = false;
     for (const portCfg of Object.values(poolConfig.ports)) {
         const portMinDiff = portCfg?.varDiff?.minDiff;
-        if (Number.isInteger(portMinDiff)) {
+        if (portMinDiff) {
             varDiffCfgFound = true;
             if (!baseShareDifficulty || portMinDiff < baseShareDifficulty) {
                 baseShareDifficulty = portMinDiff;

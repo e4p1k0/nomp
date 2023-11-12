@@ -44,31 +44,6 @@ let logger = new PoolLogger({
     logColors: portalConfig.logColors
 });
 
-//  Try to give process ability to handle 100k concurrent connections
-try {
-    let posix = require('posix');
-    try {
-        posix.setrlimit('nofile', { soft: 100000, hard: 100000 });
-    }
-    catch(e){
-        if (cluster.isMaster)
-            logger.warning('POSIX', 'Connection Limit', '(Safe to ignore) Must be ran as root to increase resource limits');
-    }
-    finally {
-        // Find out which user used sudo through the environment variable
-        let uid = parseInt(process.env.SUDO_UID);
-        // Set our server's uid to that user
-        if (uid) {
-            process.setuid(uid);
-            logger.debug('POSIX', 'Connection Limit', 'Raised to 100K concurrent connections, now running as non-root user: ' + process.getuid());
-        }
-    }
-}
-catch(e) {
-    if (cluster.isMaster)
-        logger.debug('POSIX', 'Connection Limit', '(Safe to ignore) POSIX module not installed and resource (connection) limit was not raised');
-}
-
 if (cluster.isWorker){
     switch(process.env.workerType){
         case 'pool':

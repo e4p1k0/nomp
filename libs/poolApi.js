@@ -176,7 +176,7 @@ function SetupChartsCollectingForPool(logger, poolOptions, setupFinished){
     const logComponent = poolOptions.name;
 
     const algo = poolOptions.coin.algorithm;
-    const shareMultiplier = Math.pow(2, 32) / algos[algo].multiplier;
+    const shareMultiplier = algos[algo].multiplier ? Math.pow(2, 32) / algos[algo].multiplier : 1;
     const redisConfig = poolOptions.redis;
     const baseName = redisConfig.baseName;
 

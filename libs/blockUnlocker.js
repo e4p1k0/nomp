@@ -314,7 +314,7 @@ function SetupForPool(logger, poolOptions, setupFinished){
                             round.height
                         ].join(':')]);
 
-                        redisCommands.push(['hincrby', `${baseName}:miners:${recipient.login}`, 'balance', recipient.reward]);
+                        redisCommands.push(['hincrbyfloat', `${baseName}:miners:${recipient.login}`, 'balance', recipient.reward]);
                     }
                 }
 

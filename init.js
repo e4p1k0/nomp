@@ -18,7 +18,6 @@ const algos = {
 };
 console.log(algos)
 
-return
 JSON.minify = JSON.minify || require("node-json-minify");
 
 if (!fs.existsSync('config.json')){

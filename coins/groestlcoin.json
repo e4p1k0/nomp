@@ -1,7 +1,0 @@
-{
-    "name": "Groestlcoin",
-    "symbol": "GRS",
-    "algorithm": "groestl",
-    "peerMagic": "f9beb4d4",
-    "peerMagicTestnet": "0b110907"
-}

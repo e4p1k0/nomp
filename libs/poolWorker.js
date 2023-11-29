@@ -1,4 +1,6 @@
 const Stratum = require('stratum-pool');
+// const KawpowStratum = require('kawpow-stratum-pool');
+
 // const redis   = require('ioredis');
 // const net     = require('net');
 const ShareProcessor = require('./shareProcessor.js');
@@ -96,6 +98,7 @@ module.exports = function(logger){
             })
         }
 
+        console.log(Stratum)
         const pool = Stratum.createPool(poolOptions, authorizeFN, logger);
         pool.on('share', function(isValidShare, isValidBlock, data){
             const shareData = JSON.stringify(data)

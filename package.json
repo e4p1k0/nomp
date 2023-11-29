@@ -44,7 +44,8 @@
         "node-json-minify": "*",
         "node-watch": "^0.7.4",
         "nonce": "*",
-        "stratum-pool": "git+https://github.com/e4p1k0/stratum-pool.git"
+        "stratum-pool": "git+https://github.com/e4p1k0/stratum-pool.git",
+        "kawpow-stratum-pool": "git+https://github.com/e4p1k0/kawpow-stratum-pool.git"
     },
     "engines": {
         "node": ">=18"

@@ -12,8 +12,13 @@ const PaymentProcessor = require('./libs/paymentProcessor.js');
 const Website = require('./libs/website.js');
 const PoolApi = require('./libs/poolApi.js');
 
-const algos = require('stratum-pool/lib/algoProperties.js');
+const algos = {
+    ...require('stratum-pool/lib/algoProperties.js'),
+    ...require('kawpow-stratum-pool/lib/algoProperties.js')
+};
+console.log(algos)
 
+return
 JSON.minify = JSON.minify || require("node-json-minify");
 
 if (!fs.existsSync('config.json')){
